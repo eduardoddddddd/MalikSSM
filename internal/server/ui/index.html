@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MalikSSM — Agent-First Secrets Manager (ASUS ROG Ally)</title>
+<style>
+  :root {
+    --bg: #090d16;
+    --panel: #111827;
+    --panel-alt: #1a2333;
+    --border: #263248;
+    --text: #f3f4f6;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --rose: #f43f5e;
+    --purple: #a855f7;
+    --mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+    --sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(circle at top right, #131c31 0%, var(--bg) 65%);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: rgba(17, 24, 39, 0.88);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #38bdf8, #6366f1);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-family: var(--mono);
+    color: #090d16;
+    font-size: 18px;
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+  }
+  .brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .brand span { font-size: 12px; color: var(--muted); display: block; }
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--mono);
+    border: 1px solid var(--border);
+    background: var(--panel-alt);
+  }
+  .badge.ok { color: var(--emerald); border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.1); }
+  .badge.warn { color: var(--amber); border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.1); }
+  .badge.danger { color: var(--rose); border-color: rgba(244, 63, 94, 0.35); background: rgba(244, 63, 94, 0.1); }
+
+  .btn {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--panel-alt);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { border-color: var(--accent); background: #222f46; }
+  .btn-primary {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    border-color: #38bdf8;
+    color: #fff;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-danger {
+    background: rgba(244, 63, 94, 0.15);
+    border-color: rgba(244, 63, 94, 0.45);
+    color: #fda4af;
+  }
+  .btn-danger:hover { background: rgba(244, 63, 94, 0.3); }
+
+  .container {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 20px 24px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  .stat-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .stat-card .val { font-size: 22px; font-weight: 700; font-family: var(--mono); margin-top: 4px; }
+  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .tab {
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+  }
+  .tab.active {
+    color: var(--accent);
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(56, 189, 248, 0.3);
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 980px) {
+    .workspace { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .card-title { font-size: 15px; font-weight: 700; }
+
+  input, select, textarea {
+    width: 100%;
+    background: #0b111e;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: var(--sans);
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  .mono { font-family: var(--mono); }
+
+  .secret-list {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .secret-item {
+    padding: 11px 13px;
+    border-radius: 9px;
+    background: var(--panel-alt);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .secret-item:hover, .secret-item.active {
+    border-color: var(--accent);
+    background: #1e293b;
+  }
+  .secret-path { font-family: var(--mono); font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  .secret-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .tag {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--accent);
+  }
+  .tag.schema {
+    background: rgba(168, 85, 247, 0.14);
+    color: #d8b4fe;
+  }
+
+  .kv-row {
+    display: grid;
+    grid-template-columns: 180px 1fr auto;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .audit-table th, .audit-table td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .audit-table th { color: var(--muted); font-weight: 600; }
+
+  .auth-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 15, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .auth-box {
+    width: 100%;
+    max-width: 430px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+  }
+  .hidden { display: none !important; }
+  .totp-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-family: var(--mono);
+  }
+  .totp-code { font-size: 22px; font-weight: 800; color: var(--emerald); letter-spacing: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-logo">M</div>
+    <div>
+      <h1>MalikSSM <span style="display:inline;font-size:11px;color:var(--accent);font-family:var(--mono)">v1.0 • Go Native</span></h1>
+      <span>Agent-First Secrets Manager • ASUS ROG Ally Vault</span>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div id="badgeVaultState" class="badge">Cargando...</div>
+    <div id="badgeDPAPI" class="badge">DPAPI/TPM</div>
+    <button class="btn" onclick="openModalSecret()">+ Nuevo Secreto</button>
+    <button class="btn btn-danger" onclick="panicLockVault()" title="Borra la Master Key de la RAM inmediatamente">🔒 Bloquear Bóveda</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Secretos Almacenados</div>
+      <div class="val" id="statSecrets">0</div>
+      <div class="sub">Envelope AES-256-GCM + AAD</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Sesiones Matutinas Activas</div>
+      <div class="val" id="statSessions">0</div>
+      <div class="sub">Heredadas por Claude / Antigravity / CLI</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">App Tokens (24/7 & ChatGPT)</div>
+      <div class="val" id="statTokens">0</div>
+      <div class="sub">Permisos acotados por ruta (Scopes)</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Protección en Memoria</div>
+      <div class="val" style="font-size:15px;color:var(--emerald);margin-top:8px">VirtualLock + Zeroize</div>
+      <div class="sub" id="statHardware">Windows DPAPI / TPM 2.0</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabBtnSecrets" onclick="switchTab('secrets')">🔑 Bóveda de Secretos</button>
+    <button class="tab" id="tabBtnTokens" onclick="switchTab('tokens')">🤖 App Tokens (Bots 24/7 y ChatGPT)</button>
+    <button class="tab" id="tabBtnAudit" onclick="switchTab('audit')">📡 Auditoría en Vivo (Agentes IA)</button>
+    <button class="tab" id="tabBtnConnect" onclick="switchTab('connect')">⚡ Guía de Conexión Rápida</button>
+  </div>
+
+  <!-- TAB 1: SECRETS -->
+  <div id="tabSecrets" class="workspace">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Buscador Semántico</div>
+        <button class="btn" style="padding:4px 10px;font-size:11px" onclick="loadSecrets()">↻ Refrescar</button>
+      </div>
+      <input type="text" id="searchInput" placeholder="Buscar por ruta, tag, descripción o campo (ej. ssh, openai, db)..." oninput="debounceSearch()">
+      <div id="secretList" class="secret-list"></div>
+    </div>
+
+    <div class="card" id="inspectorCard">
+      <div id="inspectorEmpty" style="padding:50px 20px;text-align:center;color:var(--muted)">
+        <div style="font-size:34px;margin-bottom:10px">🛡️</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text)">Selecciona un secreto o crea uno nuevo</div>
+        <p style="font-size:13px;margin-top:6px">Los agentes (Claude, Antigravity, ChatGPT) descubren las rutas y esquemas automáticamente sin exponerse hasta que los necesitan.</p>
+      </div>
+
+      <div id="inspectorContent" class="hidden">
+        <div class="card-header" style="border-bottom:1px solid var(--border);padding-bottom:12px">
+          <div>
+            <div class="mono" id="inspPath" style="font-size:18px;font-weight:700;color:var(--accent)"></div>
+            <div id="inspDesc" style="font-size:13px;color:var(--muted);margin-top:2px"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="inspStage" style="width:auto" onchange="reloadCurrentSecret()">
+              <option value="AWSCURRENT">AWSCURRENT (Actual)</option>
+              <option value="AWSPREVIOUS">AWSPREVIOUS (Anterior)</option>
+            </select>
+            <button class="btn" onclick="editCurrentSecret()">✏️ Editar / Rotar</button>
+            <button class="btn btn-danger" onclick="deleteCurrentSecret()">🗑️</button>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0;flex-wrap:wrap;gap:10px">
+          <div id="inspTags" class="tag-row"></div>
+          <div id="totpWidget" class="totp-box hidden">
+            <div>
+              <div style="font-size:10px;color:var(--muted)">CÓDIGO 2FA TOTP</div>
+              <div class="totp-code" id="totpCode">------</div>
+            </div>
+            <div style="font-size:12px;color:var(--muted)" id="totpTimer">30s</div>
+            <button class="btn" style="padding:4px 8px;font-size:11px" onclick="copyText(document.getElementById('totpCode').innerText)">Copiar</button>
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:12px;color:var(--muted);text-transform:uppercase;font-weight:600">Campos Desencriptados (AES-256-GCM)</span>
+            <button class="btn" style="padding:4px 10px;font-size:11px" onclick="toggleRevealAll()">👁️ Mostrar / Ocultar</button>
+          </div>
+          <div id="inspFields"></div>
+        </div>
+
+        <div style="margin-top:18px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);font-family:var(--mono)" id="inspMetaFooter"></div>
+      </div>
+
+      <!-- CREATE / EDIT FORM -->
+      <div id="secretFormBox" class="hidden">
+        <div class="card-header">
+          <div class="card-title" id="formTitle">Crear / Actualizar Secreto</div>
+          <button class="btn" onclick="closeSecretForm()">Cancelar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <label style="font-size:12px;color:var(--muted)">Ruta jerárquica (Path)</label>
+            <input type="text" id="fPath" class="mono" placeholder="ej. servidores/hetzner/ssh o apis/openai/prod">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted)">Tipo</label>
+            <select id="fType">
+              <option value="kv">kv (Diccionario Clave-Valor)</option>
+              <option value="string">string (Token / Contraseña plana)</option>
+              <option value="env">env (Variables de entorno para malik run)</option>
+              <option value="totp">totp (Semilla 2FA / otpauth://)</option>
+              <option value="ssh_key">ssh_key (Clave privada SSH)</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div>
+            <label style="font-size:12px;color:var(--muted)">Descripción semántica (para que los agentes sepan qué es)</label>
+            <input type="text" id="fDesc" placeholder="ej. Credenciales SSH del servidor de producción Hetzner">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted)">Etiquetas (Tags separadas por coma)</label>
+            <input type="text" id="fTags" class="mono" placeholder="ssh, prod, hetzner">
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="font-size:12px;color:var(--muted);font-weight:600">Pares Clave / Valor del Secreto</label>
+            <button class="btn" style="padding:4px 10px;font-size:11px" onclick="addKVRow('', '')">+ Añadir Campo</button>
+          </div>
+          <div id="kvContainer"></div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+          <button class="btn btn-primary" onclick="saveSecretForm()">💾 Cifrar y Guardar en Bóveda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: APP TOKENS -->
+  <div id="tabTokens" class="card hidden">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Tokens de Máquina (App Tokens) — Para Bots 24/7 y ChatGPT Actions</div>
+        <div style="font-size:12px;color:var(--muted)">Nota: Claude, Antigravity y tu CLI en tus ordenadores NO necesitan estos tokens (usan automáticamente tu sesión de <code>malik login</code>).</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1.5fr 1fr auto;gap:10px;margin-bottom:16px;align-items:end;background:var(--panel-alt);padding:14px;border-radius:10px">
+      <div>
+        <label style="font-size:12px;color:var(--muted)">Nombre de la App / Agente</label>
+        <input type="text" id="tokName" placeholder="ej. chatgpt-action o bot-telegram">
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--muted)">Rutas Permitidas (Scopes separados por coma)</label>
+        <input type="text" id="tokScopes" class="mono" value="*" placeholder="ej. apis/openai/*, clientes/acme/*">
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--muted)">Permisos</label>
+        <input type="text" id="tokPerms" class="mono" value="read,search,totp">
+      </div>
+      <button class="btn btn-primary" onclick="createAppToken()">+ Generar Token</button>
+    </div>
+
+    <div id="newTokenBanner" class="hidden" style="margin-bottom:16px;padding:14px;border-radius:10px;background:rgba(16,185,129,0.12);border:1px solid var(--emerald)">
+      <div style="font-size:12px;color:var(--emerald);font-weight:700">¡Token generado! Cópialo ahora (no se vuelve a mostrar en texto plano):</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+        <input type="text" id="newTokenValue" class="mono" readonly style="font-weight:700;color:#fff">
+        <button class="btn btn-primary" onclick="copyText(document.getElementById('newTokenValue').value)">Copiar</button>
+      </div>
+    </div>
+
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Prefijo</th>
+          <th>Scopes Permitidos</th>
+          <th>Permisos</th>
+          <th>Creado</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="tokensTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- TAB 3: AUDIT LOG -->
+  <div id="tabAudit" class="card hidden">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Registro de Auditoría en Tiempo Real (SSE Stream)</div>
+        <div style="font-size:12px;color:var(--muted)">Cada lectura, búsqueda o generación TOTP de Claude, Antigravity, ChatGPT o scripts queda registrada.</div>
+      </div>
+      <button class="btn" onclick="loadAudit()">↻ Actualizar</button>
+    </div>
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Agente / Llamador</th>
+          <th>Acción</th>
+          <th>Secreto / Query</th>
+          <th>Sujeto</th>
+          <th>IP</th>
+          <th>Estado</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody id="auditTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- TAB 4: QUICK CONNECT -->
+  <div id="tabConnect" class="card hidden">
+    <div class="card-title" style="margin-bottom:12px">Cómo trabajan tus Agentes y Programas con esta Bóveda</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:var(--panel-alt);padding:16px;border-radius:10px">
+        <h3 style="font-size:14px;color:var(--accent);margin-bottom:8px">1. Tu rutina de la mañana en cualquier PC</h3>
+        <pre class="mono" style="background:#080c14;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto">malik login --server <span class="srvUrl"></span>
+# ¿No quieres hacer login cada mañana en tu PC fijo?
+malik login --server <span class="srvUrl"></span> --days 30</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">Guarda la sesión cifrada con Windows DPAPI en tu PC. Claude, Antigravity y tu terminal la usan automáticamente sin pedirte tokens.</p>
+      </div>
+      <div style="background:var(--panel-alt);padding:16px;border-radius:10px">
+        <h3 style="font-size:14px;color:var(--accent);margin-bottom:8px">2. Inyectar secretos en cualquier programa sin archivos .env</h3>
+        <pre class="mono" style="background:#080c14;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto">malik run -s apis/openai -s db/prod -- python app.py</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">Inyecta todas las claves en la memoria RAM del proceso hijo y censura cualquier fuga accidental en consola.</p>
+      </div>
+      <div style="background:var(--panel-alt);padding:16px;border-radius:10px">
+        <h3 style="font-size:14px;color:var(--accent);margin-bottom:8px">3. Compatibilidad directa con AWS Boto3</h3>
+        <pre class="mono" style="background:#080c14;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto">import boto3
+sm = boto3.client(
+    "secretsmanager",
+    endpoint_url="<span class="srvUrl"></span>",
+    aws_access_key_id="mlk_live_...",
+    aws_secret_access_key="unused",
+    region_name="local"
+)
+print(sm.get_secret_value(SecretId="apis/openai")["SecretString"])</pre>
+      </div>
+      <div style="background:var(--panel-alt);padding:16px;border-radius:10px">
+        <h3 style="font-size:14px;color:var(--accent);margin-bottom:8px">4. Conectar ChatGPT (Custom GPT Actions)</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Importa directamente esta URL de esquema OpenAPI 3.1 en tu Custom GPT:</p>
+        <pre class="mono" style="background:#080c14;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto"><span class="srvUrl"></span>/openapi.json</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN / INIT MODAL -->
+<div id="authModal" class="auth-modal hidden">
+  <div class="auth-box">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div class="brand-logo">M</div>
+      <div>
+        <h2 id="authTitle" style="font-size:17px">Desbloquear MalikSSM</h2>
+        <p id="authSubtitle" style="font-size:12px;color:var(--muted)">Introduce tu Contraseña Maestra</p>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--muted)">Contraseña Maestra (Master Passphrase)</label>
+      <input type="password" id="authPass" placeholder="••••••••••••" onkeydown="if(event.key==='Enter') submitAuth()">
+    </div>
+    <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="authAutoUnseal" checked style="width:auto">
+      <label for="authAutoUnseal" style="font-size:12px;color:var(--muted)">Activar Auto-Unseal con Hardware Windows DPAPI / TPM en la ROG Ally</label>
+    </div>
+    <div id="authError" style="color:var(--rose);font-size:12px;margin-bottom:10px"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="submitAuth()">Entrar en la Bóveda</button>
+  </div>
+</div>
+
+<script>
+let sessionToken = localStorage.getItem('malik_ui_token') || '';
+let currentSecret = null;
+let revealSecrets = false;
+let totpInterval = null;
+let sseSource = null;
+
+document.querySelectorAll('.srvUrl').forEach(el => el.innerText = window.location.origin);
+
+async function api(path, opts = {}) {
+  const headers = opts.headers || {};
+  if (sessionToken) headers['Authorization'] = 'Bearer ' + sessionToken;
+  headers['X-Malik-Agent'] = 'web-ui';
+  if (opts.body && typeof opts.body === 'object') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const res = await fetch(path, { ...opts, headers });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 423) {
+    showAuthModal();
+    throw new Error(data.error || 'No autorizado');
+  }
+  if (!res.ok) throw new Error(data.error || 'Error en petición');
+  return data;
+}
+
+async function refreshStatus() {
+  try {
+    const st = await fetch('/v1/system/status').then(r => r.json());
+    document.getElementById('statSecrets').innerText = st.secret_count;
+    document.getElementById('statSessions').innerText = st.active_sessions;
+    document.getElementById('statTokens').innerText = st.app_token_count;
+
+    const bState = document.getElementById('badgeVaultState');
+    if (!st.initialized) {
+      bState.className = 'badge warn';
+      bState.innerText = '● NO INICIALIZADA';
+      showAuthModal(true);
+      return;
+    }
+    if (!st.unlocked) {
+      bState.className = 'badge danger';
+      bState.innerText = '🔒 BÓVEDA BLOQUEADA';
+      showAuthModal(false);
+      return;
+    }
+    bState.className = 'badge ok';
+    bState.innerText = '● DESBLOQUEADA (RAM Lock)';
+
+    const bDpapi = document.getElementById('badgeDPAPI');
+    bDpapi.className = st.auto_unseal_ready ? 'badge ok' : 'badge warn';
+    bDpapi.innerText = st.auto_unseal_ready ? '🛡️ Auto-Unseal TPM Activo' : 'Auto-Unseal Manual';
+
+    if (!sessionToken) {
+      showAuthModal(false);
+    } else {
+      await loadSecrets();
+      connectAuditStream();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function showAuthModal(isInit = false) {
+  const m = document.getElementById('authModal');
+  m.classList.remove('hidden');
+  document.getElementById('authTitle').innerText = isInit ? 'Inicializar Bóveda MalikSSM' : 'Iniciar Sesión / Desbloquear';
+  document.getElementById('authSubtitle').innerText = isInit
+    ? 'Crea tu Contraseña Maestra para cifrar la ASUS ROG Ally'
+    : 'Introduce tu Contraseña Maestra';
+  setTimeout(() => document.getElementById('authPass').focus(), 50);
+}
+
+async function submitAuth() {
+  const pass = document.getElementById('authPass').value;
+  const errEl = document.getElementById('authError');
+  errEl.innerText = '';
+  try {
+    const res = await fetch('/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase: pass, client_host: 'Web-Dashboard', agent_name: 'web-ui', ttl_hours: 24 })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error de autenticación');
+    sessionToken = data.token;
+    localStorage.setItem('malik_ui_token', sessionToken);
+    document.getElementById('authPass').value = '';
+    document.getElementById('authModal').classList.add('hidden');
+    await refreshStatus();
+  } catch (e) {
+    errEl.innerText = e.message;
+  }
+}
+
+let searchTimer = null;
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadSecrets, 150);
+}
+
+async function loadSecrets() {
+  const q = document.getElementById('searchInput').value.trim();
+  const listEl = document.getElementById('secretList');
+  try {
+    let items = [];
+    if (q) {
+      const data = await api('/v1/search?q=' + encodeURIComponent(q));
+      items = data.results || [];
+    } else {
+      const data = await api('/v1/secrets');
+      items = data.secrets || [];
+    }
+    if (items.length === 0) {
+      listEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">No hay secretos todavía. Pulsa "+ Nuevo Secreto".</div>`;
+      return;
+    }
+    listEl.innerHTML = items.map(item => `
+      <div class="secret-item ${currentSecret && currentSecret.path === item.path ? 'active' : ''}" onclick="selectSecret('${item.path}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="secret-path">${escapeHtml(item.path)}</span>
+          <span class="badge" style="font-size:10px;padding:1px 7px">v${item.current_version} • ${item.type}</span>
+        </div>
+        ${item.description ? `<div class="secret-desc">${escapeHtml(item.description)}</div>` : ''}
+        <div class="tag-row">
+          ${(item.tags || []).map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}
+          ${(item.schema_keys || []).map(k => `<span class="tag schema">${escapeHtml(k)}</span>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function selectSecret(path) {
+  document.getElementById('secretFormBox').classList.add('hidden');
+  document.getElementById('inspStage').value = 'AWSCURRENT';
+  await fetchAndRenderSecret(path, 'AWSCURRENT');
+}
+
+async function reloadCurrentSecret() {
+  if (!currentSecret) return;
+  const stage = document.getElementById('inspStage').value;
+  await fetchAndRenderSecret(currentSecret.path, stage);
+}
+
+async function fetchAndRenderSecret(path, stage) {
+  try {
+    const sec = await api(`/v1/secrets/${path}?stage=${encodeURIComponent(stage)}`);
+    currentSecret = sec;
+    document.getElementById('inspectorEmpty').classList.add('hidden');
+    document.getElementById('inspectorContent').classList.remove('hidden');
+
+    document.getElementById('inspPath').innerText = sec.path;
+    document.getElementById('inspDesc').innerText = sec.description || 'Sin descripción';
+    document.getElementById('inspTags').innerHTML = (sec.tags || []).map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join('');
+
+    renderSecretFields();
+    setupTOTPCheck(sec);
+
+    document.getElementById('inspMetaFooter').innerText =
+      `ARN: ${sec.arn} | Versión: v${sec.version} (${(sec.stages||[]).join(',')}) | Último acceso: ${sec.last_accessed_by || 'n/a'}`;
+    loadSecrets();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function renderSecretFields() {
+  if (!currentSecret) return;
+  const container = document.getElementById('inspFields');
+  const data = currentSecret.data || { value: currentSecret.value };
+  container.innerHTML = Object.entries(data).map(([k, v]) => `
+    <div style="display:grid;grid-template-columns:180px 1fr auto;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="text" class="mono" readonly value="${escapeHtml(k)}" style="color:var(--accent);font-weight:600">
+      <input type="${revealSecrets ? 'text' : 'password'}" class="mono" readonly value="${escapeHtml(v)}">
+      <button class="btn" onclick="copyText(${JSON.stringify(v).replace(/"/g, '&quot;')})">📋 Copiar</button>
+    </div>
+  `).join('');
+}
+
+function toggleRevealAll() {
+  revealSecrets = !revealSecrets;
+  renderSecretFields();
+}
+
+function setupTOTPCheck(sec) {
+  clearInterval(totpInterval);
+  const w = document.getElementById('totpWidget');
+  const keys = Object.keys(sec.data || {});
+  const hasTotp = sec.type === 'totp' || keys.some(k => ['totp','otp','mfa','seed'].includes(k.toLowerCase()));
+  if (!hasTotp) {
+    w.classList.add('hidden');
+    return;
+  }
+  w.classList.remove('hidden');
+  const refreshOtp = async () => {
+    try {
+      const r = await api(`/v1/totp/${sec.path}`);
+      document.getElementById('totpCode').innerText = r.code;
+      document.getElementById('totpTimer').innerText = r.seconds_remaining + 's';
+    } catch (_) {
+      w.classList.add('hidden');
+    }
+  };
+  refreshOtp();
+  totpInterval = setInterval(refreshOtp, 1000);
+}
+
+function openModalSecret() {
+  document.getElementById('inspectorEmpty').classList.add('hidden');
+  document.getElementById('inspectorContent').classList.add('hidden');
+  document.getElementById('secretFormBox').classList.remove('hidden');
+  document.getElementById('formTitle').innerText = 'Nuevo Secreto';
+  document.getElementById('fPath').value = '';
+  document.getElementById('fType').value = 'kv';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fTags').value = '';
+  document.getElementById('kvContainer').innerHTML = '';
+  addKVRow('username', '');
+  addKVRow('password', '');
+}
+
+function editCurrentSecret() {
+  if (!currentSecret) return;
+  document.getElementById('inspectorContent').classList.add('hidden');
+  document.getElementById('secretFormBox').classList.remove('hidden');
+  document.getElementById('formTitle').innerText = 'Rotar / Editar: ' + currentSecret.path;
+  document.getElementById('fPath').value = currentSecret.path;
+  document.getElementById('fType').value = currentSecret.type || 'kv';
+  document.getElementById('fDesc').value = currentSecret.description || '';
+  document.getElementById('fTags').value = (currentSecret.tags || []).join(', ');
+  document.getElementById('kvContainer').innerHTML = '';
+  const data = currentSecret.data || { value: currentSecret.value };
+  Object.entries(data).forEach(([k, v]) => addKVRow(k, v));
+}
+
+function closeSecretForm() {
+  document.getElementById('secretFormBox').classList.add('hidden');
+  if (currentSecret) {
+    document.getElementById('inspectorContent').classList.remove('hidden');
+  } else {
+    document.getElementById('inspectorEmpty').classList.remove('hidden');
+  }
+}
+
+function addKVRow(k = '', v = '') {
+  const div = document.createElement('div');
+  div.className = 'kv-row';
+  div.innerHTML = `
+    <input type="text" class="mono kv-key" placeholder="clave (ej. password)" value="${escapeHtml(k)}">
+    <input type="text" class="mono kv-val" placeholder="valor secreto" value="${escapeHtml(v)}">
+    <button class="btn btn-danger" onclick="this.parentElement.remove()">✕</button>
+  `;
+  document.getElementById('kvContainer').appendChild(div);
+}
+
+async function saveSecretForm() {
+  const path = document.getElementById('fPath').value.trim();
+  const type = document.getElementById('fType').value;
+  const description = document.getElementById('fDesc').value.trim();
+  const tags = document.getElementById('fTags').value.split(',').map(s => s.trim()).filter(Boolean);
+
+  const data = {};
+  document.querySelectorAll('#kvContainer .kv-row').forEach(row => {
+    const k = row.querySelector('.kv-key').value.trim();
+    const v = row.querySelector('.kv-val').value;
+    if (k) data[k] = v;
+  });
+
+  if (!path) return alert('Indica la ruta del secreto');
+  try {
+    await api('/v1/secrets', {
+      method: 'POST',
+      body: { path, type, description, tags, data, value: data.value || '' }
+    });
+    await refreshStatus();
+    await selectSecret(path);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function deleteCurrentSecret() {
+  if (!currentSecret) return;
+  if (!confirm(`¿Seguro que deseas eliminar ${currentSecret.path}?`)) return;
+  try {
+    await api(`/v1/secrets/${currentSecret.path}`, { method: 'DELETE' });
+    currentSecret = null;
+    document.getElementById('inspectorContent').classList.add('hidden');
+    document.getElementById('inspectorEmpty').classList.remove('hidden');
+    await refreshStatus();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function panicLockVault() {
+  if (!confirm('¿Bloquear la bóveda inmediatamente? Esto borrará la Master Key de la memoria RAM y revocará las sesiones activas.')) return;
+  try {
+    await api('/v1/system/lock', { method: 'POST', body: { revoke_sessions: true } });
+    sessionToken = '';
+    localStorage.removeItem('malik_ui_token');
+    await refreshStatus();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function switchTab(tab) {
+  ['secrets', 'tokens', 'audit', 'connect'].forEach(t => {
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+    document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+  });
+  if (tab === 'tokens') loadTokens();
+  if (tab === 'audit') loadAudit();
+}
+
+async function loadTokens() {
+  try {
+    const data = await api('/v1/tokens');
+    const tbody = document.getElementById('tokensTableBody');
+    tbody.innerHTML = (data.tokens || []).map(t => `
+      <tr>
+        <td>${t.id}</td>
+        <td style="font-weight:700;color:var(--accent)">${escapeHtml(t.name)}</td>
+        <td>${escapeHtml(t.token_prefix)}</td>
+        <td>${(t.allowed_scopes || []).join(', ')}</td>
+        <td>${(t.permissions || []).join(', ')}</td>
+        <td>${new Date(t.created_at).toLocaleString()}</td>
+        <td><button class="btn btn-danger" style="padding:3px 8px;font-size:11px" onclick="revokeToken('${t.id}')">Revocar</button></td>
+      </tr>
+    `).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function createAppToken() {
+  const name = document.getElementById('tokName').value.trim();
+  const allowed_scopes = document.getElementById('tokScopes').value.split(',').map(s => s.trim()).filter(Boolean);
+  const permissions = document.getElementById('tokPerms').value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!name) return alert('Ponle un nombre al token');
+  try {
+    const res = await api('/v1/tokens', { method: 'POST', body: { name, allowed_scopes, permissions } });
+    document.getElementById('newTokenValue').value = res.token;
+    document.getElementById('newTokenBanner').classList.remove('hidden');
+    document.getElementById('tokName').value = '';
+    await loadTokens();
+    await refreshStatus();
+  } catch (e) { alert(e.message); }
+}
+
+async function revokeToken(id) {
+  await api('/v1/tokens/' + id, { method: 'DELETE' });
+  await loadTokens();
+  await refreshStatus();
+}
+
+async function loadAudit() {
+  try {
+    const data = await api('/v1/audit?limit=80');
+    const tbody = document.getElementById('auditTableBody');
+    tbody.innerHTML = (data.entries || []).map(renderAuditRow).join('');
+  } catch (e) { console.error(e); }
+}
+
+function renderAuditRow(e) {
+  const color = e.status === 'OK' ? 'var(--emerald)' : 'var(--rose)';
+  return `
+    <tr>
+      <td>${new Date(e.timestamp).toLocaleTimeString()}</td>
+      <td style="font-weight:700;color:var(--accent)">${escapeHtml(e.agent)}</td>
+      <td>${escapeHtml(e.action)}</td>
+      <td>${escapeHtml(e.path || '-')}</td>
+      <td>${escapeHtml(e.subject)}</td>
+      <td>${escapeHtml(e.client_ip)}</td>
+      <td style="color:${color};font-weight:700">${escapeHtml(e.status)}</td>
+      <td style="color:var(--muted)">${escapeHtml(e.detail || '')}</td>
+    </tr>
+  `;
+}
+
+function connectAuditStream() {
+  if (sseSource || !sessionToken) return;
+  sseSource = new EventSource('/v1/audit/stream?token=' + encodeURIComponent(sessionToken));
+  sseSource.onmessage = (ev) => {
+    try {
+      const entry = JSON.parse(ev.data);
+      const tbody = document.getElementById('auditTableBody');
+      if (tbody) {
+        tbody.insertAdjacentHTML('afterbegin', renderAuditRow(entry));
+      }
+    } catch (_) {}
+  };
+}
+
+function copyText(txt) {
+  navigator.clipboard.writeText(txt);
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+refreshStatus();
+</script>
+</body>
+</html>

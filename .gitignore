@@ -1,0 +1,15 @@
+# MalikSSM Vault Data & Hardware Unseal Blobs (NEVER COMMIT)
+data/
+*.db
+*.db.unseal
+*.unseal
+session.bin
+*.token
+.env
+.env.*
+
+# OS & Editor temporary files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
