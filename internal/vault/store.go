@@ -1005,8 +1005,8 @@ func (s *Store) Status() VaultStatus {
 		SecretCount:     secCount,
 		ActiveSessions:  sessCount,
 		AppTokenCount:   tokCount,
-		Encryption:      "Envelope AES-256-GCM + Argon2id (64MB) + VirtualLock",
-		HardwareBacking: "Windows DPAPI / TPM 2.0",
+		Encryption:      "Envelope AES-256-GCM + Argon2id (64MB) + RAM Page Lock",
+		HardwareBacking: security.HardwareProviderName(),
 		ServerTime:      now,
 	}
 }

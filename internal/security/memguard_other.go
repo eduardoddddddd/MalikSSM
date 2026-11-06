@@ -6,35 +6,76 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
 	"os/user"
+	"runtime"
+	"strings"
+
+	"golang.org/x/crypto/argon2"
+	"golang.org/x/sys/unix"
 )
 
-func lockMemory(_ []byte) error {
-	return nil
+func lockMemory(b []byte) error {
+	if len(b) == 0 {
+		return nil
+	}
+	return unix.Mlock(b)
 }
 
-func unlockMemory(_ []byte) error {
-	return nil
+func unlockMemory(b []byte) error {
+	if len(b) == 0 {
+		return nil
+	}
+	return unix.Munlock(b)
 }
 
-func deriveHostFallbackKey(extraContext string) []byte {
+// HardwareProviderName returns a human-readable description of the OS hardware/memory backing.
+func HardwareProviderName() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "macOS Host-Key Sealing + unix.Mlock"
+	case "linux":
+		return "Linux Machine-ID Sealing + unix.Mlock"
+	default:
+		return runtime.GOOS + " Host Sealing + unix.Mlock"
+	}
+}
+
+func deriveHostKey(extraContext string, salt []byte) []byte {
 	host, _ := os.Hostname()
 	u, _ := user.Current()
 	uid := "0"
 	if u != nil {
-		uid = u.Uid + ":" + u.Username
+		uid = u.Uid + ":" + u.Username + ":" + u.HomeDir
 	}
-	h := sha256.New()
-	h.Write([]byte("MalikSSM::FallbackKey::" + host + "::" + uid + "::" + extraContext))
-	return h.Sum(nil)
+
+	machineID := ""
+	for _, p := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
+		if raw, err := os.ReadFile(p); err == nil && len(raw) > 0 {
+			machineID = strings.TrimSpace(string(raw))
+			break
+		}
+	}
+
+	material := fmt.Sprintf("MalikSSM::UnixHostSeal::%s::%s::%s::%s::%s",
+		runtime.GOOS, host, uid, machineID, extraContext)
+	return argon2.IDKey([]byte(material), salt, 2, 32*1024, 2, 32)
 }
 
+// ProtectBytesHardware seals sensitive bytes on macOS and Linux using Argon2id + AES-256-GCM
+// bound to the host identity, OS user UID, and machine-id.
 func ProtectBytesHardware(plaintext []byte, extraContext string) ([]byte, error) {
-	key := deriveHostFallbackKey(extraContext)
+	if len(plaintext) == 0 {
+		return nil, fmt.Errorf("cannot protect empty payload")
+	}
+
+	salt := make([]byte, 16)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, err
+	}
+	key := deriveHostKey(extraContext, salt)
 	defer Zeroize(key)
 
 	block, err := aes.NewCipher(key)
@@ -49,11 +90,24 @@ func ProtectBytesHardware(plaintext []byte, extraContext string) ([]byte, error)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
-	return gcm.Seal(nonce, nonce, plaintext, []byte(extraContext)), nil
+
+	sealed := gcm.Seal(nil, nonce, plaintext, []byte(extraContext))
+	out := make([]byte, 0, len(salt)+len(nonce)+len(sealed))
+	out = append(out, salt...)
+	out = append(out, nonce...)
+	out = append(out, sealed...)
+	return out, nil
 }
 
+// UnprotectBytesHardware unseals bytes previously protected with ProtectBytesHardware on macOS/Linux.
 func UnprotectBytesHardware(ciphertext []byte, extraContext string) ([]byte, error) {
-	key := deriveHostFallbackKey(extraContext)
+	if len(ciphertext) < 16+12 {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+	salt := ciphertext[:16]
+	rest := ciphertext[16:]
+
+	key := deriveHostKey(extraContext, salt)
 	defer Zeroize(key)
 
 	block, err := aes.NewCipher(key)
@@ -64,10 +118,11 @@ func UnprotectBytesHardware(ciphertext []byte, extraContext string) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	if len(ciphertext) < gcm.NonceSize() {
-		return nil, fmt.Errorf("ciphertext too short")
+	nonceSize := gcm.NonceSize()
+	if len(rest) < nonceSize {
+		return nil, fmt.Errorf("invalid sealed blob")
 	}
-	nonce := ciphertext[:gcm.NonceSize()]
-	enc := ciphertext[gcm.NonceSize():]
+	nonce := rest[:nonceSize]
+	enc := rest[nonceSize:]
 	return gcm.Open(nil, nonce, enc, []byte(extraContext))
 }

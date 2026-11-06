@@ -45,8 +45,13 @@ class MalikClient:
         candidates = [
             shutil.which("malik"),
             shutil.which("malik.exe"),
+            os.path.expanduser("~/.local/bin/malik"),
+            "/usr/local/bin/malik",
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin", "malik.exe")),
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "malik.exe")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin", "malik-darwin-arm64")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin", "malik-darwin-amd64")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin", "malik-linux-amd64")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin", "malik-linux-arm64")),
         ]
         for exe in candidates:
             if exe and os.path.isfile(exe):

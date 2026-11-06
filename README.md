@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/ChatGPT_Actions-OpenAPI_3.1-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAPI 3.1" />
   <img src="https://img.shields.io/badge/2FA-RFC_6238_TOTP_Generator-06B6D4?style=flat-square&logo=googleauthenticator&logoColor=white" alt="TOTP 2FA" />
   <img src="https://img.shields.io/badge/Storage-bbolt_ACID-3B82F6?style=flat-square&logo=databricks&logoColor=white" alt="bbolt ACID" />
-  <img src="https://img.shields.io/badge/Host-Windows_Server_24%2F7-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows Server 24/7" />
+  <img src="https://img.shields.io/badge/Host-Windows_%7C_Linux_%7C_macOS-0078D6?style=flat-square&logo=linux&logoColor=white" alt="Multi-OS" />
   <img src="https://img.shields.io/badge/Tests-Passing_100%25-22C55E?style=flat-square&logo=checkmarx&logoColor=white" alt="Tests Passing" />
 </p>
 
@@ -302,8 +302,13 @@ print(resp["SecretString"])
 ```text
 MalikSSM/
 ├── bin/
-│   ├── malikd.exe                  # Binario nativo del Servidor Windows — 7.08 MB
-│   └── malik.exe                   # Binario nativo Cliente + MCP + Inyector — 6.39 MB
+│   ├── malikd.exe                  # Servidor nativo Windows (x64)
+│   ├── malikd-linux-amd64          # Servidor nativo Linux (x64)
+│   ├── malik.exe                   # Cliente Todo-en-Uno Windows (x64)
+│   ├── malik-darwin-arm64          # Cliente Todo-en-Uno macOS Apple Silicon (M1/M2/M3/M4)
+│   ├── malik-darwin-amd64          # Cliente Todo-en-Uno macOS Intel (x64)
+│   ├── malik-linux-amd64           # Cliente Todo-en-Uno Linux (x64)
+│   └── malik-linux-arm64           # Cliente Todo-en-Uno Linux (ARM64)
 ├── cmd/
 │   ├── malikd/main.go              # Punto de entrada del servidor (flags, señales OS, arranque)
 │   └── malik/main.go               # Punto de entrada del CLI, MCP y auto-configurador de agentes
@@ -340,18 +345,20 @@ MalikSSM/
 ├── sdk/
 │   └── python/malik.py             # SDK Python sin dependencias + adaptador automático boto3
 ├── scripts/
+│   ├── build-all.ps1               # Compilación cruzada estática para Windows, macOS y Linux
 │   ├── install-server.ps1          # Instalador de servicio de arranque y firewall para Servidor Windows
-│   └── init-agents.ps1             # Configurador automático de PATH, MCP y reglas globales en tus PCs
+│   ├── init-agents.ps1             # Configurador automático de PATH, MCP y reglas globales en Windows
+│   └── init-agents.sh              # Configurador automático de PATH, MCP y reglas globales en macOS y Linux
 ├── go.mod
 └── README.md
 ```
 
 ---
 
-## 9. Guía de Despliegue en Servidor Windows y Ordenadores de Trabajo
+## 9. Guía de Despliegue en Servidor Windows y Ordenadores de Trabajo (Windows, macOS y Linux)
 
-### Paso 1: Despliegue en el Servidor Windows (Nodo Central 24/7)
-1. Clona el repositorio o copia `bin\malikd.exe`, `bin\malik.exe` y `scripts\install-server.ps1` a tu servidor Windows.
+### Paso 1: Despliegue en el Servidor Central (Nodo 24/7)
+1. Clona el repositorio o copia `bin\malikd.exe`, `bin\malik.exe` y `scripts\install-server.ps1` a tu servidor Windows (o usa `bin/malikd-linux-amd64` si lo despliegas en Linux).
 2. Abre PowerShell como Administrador en el servidor y ejecuta:
    ```powershell
    .\scripts\install-server.ps1 -Port 8443
@@ -359,15 +366,24 @@ MalikSSM/
    *Esto copia los binarios a `C:\MalikSSM`, abre el puerto TCP `8443` en la red privada/Tailscale y registra la tarea `MalikSSM-Server-Daemon` para que arranque automáticamente al iniciar Windows.*
 3. Abre `http://127.0.0.1:8443/ui` en el navegador del servidor (o desde tu PC usando la IP local/Tailscale del servidor) e introduce tu **Contraseña Maestra** dejando marcada la casilla **Auto-Unseal con Hardware Windows DPAPI / TPM**.
 
-### Paso 2: Configuración en cada uno de tus Ordenadores (PCs donde usas Claude / Antigravity)
-1. Copia `bin\malik.exe` y `scripts\init-agents.ps1` al ordenador (o clona el repositorio).
-2. Ejecuta en PowerShell:
+### Paso 2A: Configuración de Cliente en Ordenadores Windows
+1. Ejecuta en PowerShell:
    ```powershell
    .\scripts\init-agents.ps1
    ```
-   *Esto añade `malik.exe` a tu `PATH` de Windows, registra automáticamente el servidor MCP `malik` en Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json`) e inyecta la directriz global en `~/.claude/CLAUDE.md` para que los agentes consulten siempre MalikSSM antes de preguntar.*
-3. Inicia sesión contra el servidor:
+2. Inicia sesión contra el servidor:
    ```powershell
+   malik login --server http://IP-DEL-SERVIDOR:8443 --days 30
+   ```
+
+### Paso 2B: Configuración de Cliente en Ordenadores macOS (Apple Silicon / Intel) y Linux (x64 / ARM64)
+1. Ejecuta el instalador Unix (detecta automáticamente `darwin/arm64`, `darwin/amd64`, `linux/amd64` o `linux/arm64`, instala `malik` en tu `PATH` y configura Claude Desktop + reglas globales):
+   ```bash
+   chmod +x ./scripts/init-agents.sh
+   ./scripts/init-agents.sh
+   ```
+2. Inicia sesión contra el servidor (se sella localmente con `unix.Mlock` + identidad del equipo):
+   ```bash
    malik login --server http://IP-DEL-SERVIDOR:8443 --days 30
    ```
 

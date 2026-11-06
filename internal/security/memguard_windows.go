@@ -25,6 +25,11 @@ func unlockMemory(b []byte) error {
 	return windows.VirtualUnlock(uintptr(unsafe.Pointer(&b[0])), uintptr(len(b)))
 }
 
+// HardwareProviderName returns a human-readable description of the OS hardware/memory backing.
+func HardwareProviderName() string {
+	return "Windows DPAPI / TPM 2.0 + Win32 VirtualLock"
+}
+
 // ProtectBytesHardware encrypts sensitive bytes (such as the Master KEK on the Servidor Central
 // or session.bin on a client workstation) using Windows DPAPI backed by the OS credential
 // store and TPM 2.0.

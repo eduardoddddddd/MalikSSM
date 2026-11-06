@@ -15,6 +15,7 @@ import (
 	"github.com/malikssm/malik/internal/client"
 	"github.com/malikssm/malik/internal/injector"
 	"github.com/malikssm/malik/internal/mcp"
+	"github.com/malikssm/malik/internal/security"
 	"github.com/malikssm/malik/internal/vault"
 )
 
@@ -118,7 +119,7 @@ func runLogin(args []string) {
 		fatal("Login failed: %v", err)
 	}
 
-	fmt.Println("✔ Sesión iniciada y sellada con Hardware Windows DPAPI")
+	fmt.Printf("✔ Sesión iniciada y sellada localmente (%s)\n", security.HardwareProviderName())
 	fmt.Printf("  Servidor   : %s\n", sess.ServerURL)
 	fmt.Printf("  Ordenador  : %s (ID: %s)\n", sess.ClientHost, sess.SessionID)
 	fmt.Printf("  Válida hasta: %s (%s)\n", sess.ExpiresAt.Local().Format("2006-01-02 15:04:05"), time.Until(sess.ExpiresAt).Round(time.Minute))
