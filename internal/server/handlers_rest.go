@@ -38,7 +38,7 @@ func (s *Server) handleInit(w http.ResponseWriter, r *http.Request) {
 
 	host := req.ClientHost
 	if host == "" {
-		host = "ROG-Ally-Setup"
+		host = "Win-Server-Setup"
 	}
 	token, sess, err := s.store.CreateSession(req.Passphrase, host, "setup", extractClientIP(r), 24*time.Hour)
 	if err != nil {

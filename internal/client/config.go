@@ -16,7 +16,7 @@ const (
 	dpapiSessionCtx   = "MalikSSM::LocalClientSessionCache::v1"
 )
 
-// LocalSession stores the workstation's active session with the ASUS ROG Ally server.
+// LocalSession stores the workstation's active session with the Windows Server server.
 type LocalSession struct {
 	ServerURL  string    `json:"server_url"`
 	Token      string    `json:"token"`

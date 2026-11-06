@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var domainEntropy = []byte("MalikSSM::HardwareDPAPI::v1::ASUS-ROG-Ally")
+var domainEntropy = []byte("MalikSSM::HardwareDPAPI::v1::ASUS-Win-Server")
 
 func lockMemory(b []byte) error {
 	if len(b) == 0 {
@@ -25,7 +25,7 @@ func unlockMemory(b []byte) error {
 	return windows.VirtualUnlock(uintptr(unsafe.Pointer(&b[0])), uintptr(len(b)))
 }
 
-// ProtectBytesHardware encrypts sensitive bytes (such as the Master KEK on the ROG Ally
+// ProtectBytesHardware encrypts sensitive bytes (such as the Master KEK on the Servidor Central
 // or session.bin on a client workstation) using Windows DPAPI backed by the OS credential
 // store and TPM 2.0.
 func ProtectBytesHardware(plaintext []byte, extraContext string) ([]byte, error) {

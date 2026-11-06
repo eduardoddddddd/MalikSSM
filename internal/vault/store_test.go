@@ -20,7 +20,7 @@ func TestVaultStoreLifecycleVersioningScopesAndAutoUnseal(t *testing.T) {
 		t.Fatalf("expected new store to be uninitialized")
 	}
 
-	// Initialize with Auto-Unseal enabled (uses Windows DPAPI on ROG Ally)
+	// Initialize with Auto-Unseal enabled (uses Windows DPAPI on Servidor Central)
 	if err := store.InitVault("MasterPass-ROG-2026!", true); err != nil {
 		t.Fatalf("InitVault failed: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestVaultStoreLifecycleVersioningScopesAndAutoUnseal(t *testing.T) {
 		t.Fatalf("expected ErrAccessDenied for bot reading bancos/personal/master, got %v", err)
 	}
 
-	// Simulate ROG Ally Reboot: close store and reopen -> should Auto-Unseal via Windows DPAPI automatically!
+	// Simulate Servidor Central Reboot: close store and reopen -> should Auto-Unseal via Windows DPAPI automatically!
 	if err := store.Close(); err != nil {
 		t.Fatalf("Close failed: %v", err)
 	}

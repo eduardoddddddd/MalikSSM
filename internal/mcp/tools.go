@@ -10,7 +10,7 @@ func toolDefinitions() []map[string]any {
 				"properties": map[string]any{
 					"query": map[string]any{
 						"type":        "string",
-						"description": "Search query keywords (e.g., 'ssh hetzner', 'openai', 'postgres', 'rog ally'). Leave empty to list all accessible secrets.",
+						"description": "Search query keywords (e.g., 'ssh hetzner', 'openai', 'postgres', 'win server'). Leave empty to list all accessible secrets.",
 					},
 					"tags": map[string]any{
 						"type":        "array",
@@ -113,7 +113,7 @@ func toolDefinitions() []map[string]any {
 		},
 		{
 			"name":        "vault_status",
-			"description": "Check MalikSSM server status, lock state, active sessions, and secret count on the ASUS ROG Ally.",
+			"description": "Check MalikSSM server status, lock state, active sessions, and secret count on the Windows Server.",
 			"inputSchema": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},

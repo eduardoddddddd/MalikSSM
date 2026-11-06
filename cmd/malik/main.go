@@ -461,7 +461,7 @@ func runLock(args []string) {
 	if _, err := api.Lock(!*keep); err != nil {
 		fatal("%v", err)
 	}
-	fmt.Println("🔒 Bóveda bloqueada en la ASUS ROG Ally (Master Key borrada de la RAM).")
+	fmt.Println("🔒 Bóveda bloqueada en la Windows Server (Master Key borrada de la RAM).")
 }
 
 func runUnlock(args []string) {
@@ -472,7 +472,7 @@ func runUnlock(args []string) {
 
 	passphrase := *pass
 	if passphrase == "" {
-		fmt.Print("Introduce tu Contraseña Maestra para desbloquear la ROG Ally: ")
+		fmt.Print("Introduce tu Contraseña Maestra para desbloquear la Servidor Central: ")
 		reader := bufio.NewReader(os.Stdin)
 		line, _ := reader.ReadString('\n')
 		passphrase = strings.TrimSpace(line)
@@ -541,7 +541,7 @@ func printUsage() {
 	fmt.Println(`MalikSSM (malik) — Cliente Universal, Inyector y Servidor MCP (Go Native)
 
 USO DIARIO:
-  malik login [--server http://rog-ally:8443] [--days 30]   Inicia sesión (se sella con Windows DPAPI)
+  malik login [--server http://win-server:8443] [--days 30]   Inicia sesión (se sella con Windows DPAPI)
   malik status                                              Estado de la bóveda y de tu sesión local
   malik ls [prefijo]                                        Lista secretos disponibles
   malik search <consulta>                                   Búsqueda semántica por ruta, tags o campos

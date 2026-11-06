@@ -16,11 +16,11 @@ func (s *Server) handleOpenAPI(w http.ResponseWriter, r *http.Request) {
 		"openapi": "3.1.0",
 		"info": map[string]any{
 			"title":       "MalikSSM Agentic Secrets Manager API",
-			"description": "Self-hosted Secrets Manager running on ASUS ROG Ally. Allows AI agents (ChatGPT, Claude, Antigravity) to search, retrieve, store, and generate 2FA TOTP codes seamlessly.",
+			"description": "Self-hosted Secrets Manager running on Windows Server. Allows AI agents (ChatGPT, Claude, Antigravity) to search, retrieve, store, and generate 2FA TOTP codes seamlessly.",
 			"version":     "1.0.0",
 		},
 		"servers": []map[string]any{
-			{"url": baseURL, "description": "MalikSSM Server (ASUS ROG Ally)"},
+			{"url": baseURL, "description": "MalikSSM Server (Windows Server)"},
 		},
 		"components": map[string]any{
 			"securitySchemes": map[string]any{

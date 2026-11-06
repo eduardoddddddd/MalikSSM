@@ -29,7 +29,7 @@ func TestFullServerRESTAndAWSEmulation(t *testing.T) {
 
 	// 1. Test Morning Login (auto-initializes on first login and saves DPAPI session.bin)
 	cli := client.New(ts.URL, "", "antigravity")
-	sess, err := cli.Login("Master-ROG-Ally-Pass-99!", 12, 0)
+	sess, err := cli.Login("Master-Win-Server-Pass-99!", 12, 0)
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}

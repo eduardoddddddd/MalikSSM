@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MalikSSM — Agent-First Secrets Manager (ASUS ROG Ally)</title>
+<title>MalikSSM — Agent-First Secrets Manager (Windows Server)</title>
 <style>
   :root {
     --bg: #090d16;
@@ -287,7 +287,7 @@
     <div class="brand-logo">M</div>
     <div>
       <h1>MalikSSM <span style="display:inline;font-size:11px;color:var(--accent);font-family:var(--mono)">v1.0 • Go Native</span></h1>
-      <span>Agent-First Secrets Manager • ASUS ROG Ally Vault</span>
+      <span>Agent-First Secrets Manager • Windows Server Vault</span>
     </div>
   </div>
   <div class="status-bar">
@@ -561,7 +561,7 @@ print(sm.get_secret_value(SecretId="apis/openai")["SecretString"])</pre>
     </div>
     <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="authAutoUnseal" checked style="width:auto">
-      <label for="authAutoUnseal" style="font-size:12px;color:var(--muted)">Activar Auto-Unseal con Hardware Windows DPAPI / TPM en la ROG Ally</label>
+      <label for="authAutoUnseal" style="font-size:12px;color:var(--muted)">Activar Auto-Unseal con Hardware Windows DPAPI / TPM en la Servidor Central</label>
     </div>
     <div id="authError" style="color:var(--rose);font-size:12px;margin-bottom:10px"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="submitAuth()">Entrar en la Bóveda</button>
@@ -638,7 +638,7 @@ function showAuthModal(isInit = false) {
   m.classList.remove('hidden');
   document.getElementById('authTitle').innerText = isInit ? 'Inicializar Bóveda MalikSSM' : 'Iniciar Sesión / Desbloquear';
   document.getElementById('authSubtitle').innerText = isInit
-    ? 'Crea tu Contraseña Maestra para cifrar la ASUS ROG Ally'
+    ? 'Crea tu Contraseña Maestra para cifrar la Windows Server'
     : 'Introduce tu Contraseña Maestra';
   setTimeout(() => document.getElementById('authPass').focus(), 50);
 }

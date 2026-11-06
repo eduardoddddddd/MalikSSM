@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Go-1.26_Native_(CGO__0)-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.26 Native" />
   <img src="https://img.shields.io/badge/Crypto-AES--256--GCM_%2B_Argon2id-10B981?style=for-the-badge&logo=letsencrypt&logoColor=white" alt="AES-256-GCM + Argon2id" />
   <img src="https://img.shields.io/badge/RAM_Guard-Win32_VirtualLock_%2B_Zeroize-EF4444?style=for-the-badge&logo=windows&logoColor=white" alt="VirtualLock + Zeroize" />
-  <img src="https://img.shields.io/badge/Hardware-DPAPI_%2F_TPM_2.0_Auto--Unseal-8B5CF6?style=for-the-badge&logo=amd&logoColor=white" alt="DPAPI TPM 2.0" />
+  <img src="https://img.shields.io/badge/Hardware-DPAPI_%2F_TPM_2.0_Auto--Unseal-8B5CF6?style=for-the-badge&logo=windows&logoColor=white" alt="DPAPI TPM 2.0" />
 </p>
 <p align="center">
   <img src="https://img.shields.io/badge/MCP_Server-Claude_%26_Antigravity_Ready-F59E0B?style=flat-square&logo=anthropic&logoColor=white" alt="MCP Ready" />
@@ -12,11 +12,11 @@
   <img src="https://img.shields.io/badge/ChatGPT_Actions-OpenAPI_3.1-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAPI 3.1" />
   <img src="https://img.shields.io/badge/2FA-RFC_6238_TOTP_Generator-06B6D4?style=flat-square&logo=googleauthenticator&logoColor=white" alt="TOTP 2FA" />
   <img src="https://img.shields.io/badge/Storage-bbolt_ACID-3B82F6?style=flat-square&logo=databricks&logoColor=white" alt="bbolt ACID" />
-  <img src="https://img.shields.io/badge/Target_Node-ASUS_ROG_Ally_24%2F7-E11D48?style=flat-square&logo=asus&logoColor=white" alt="ASUS ROG Ally" />
+  <img src="https://img.shields.io/badge/Host-Windows_Server_24%2F7-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows Server 24/7" />
   <img src="https://img.shields.io/badge/Tests-Passing_100%25-22C55E?style=flat-square&logo=checkmarx&logoColor=white" alt="Tests Passing" />
 </p>
 
-> **Infraestructura criptográfica de gestión de secretos y sesiones de grado industrial escrita en Go 1.26 nativo (`CGO_ENABLED=0`), diseñada para ejecutarse 24/7 en tu ASUS ROG Ally y eliminar por completo la fricción de credenciales entre humanos, agentes de IA (Claude, Antigravity, ChatGPT) y aplicaciones.**
+> **Infraestructura criptográfica de gestión de secretos y sesiones de grado industrial escrita en Go 1.26 nativo (`CGO_ENABLED=0`), diseñada para ejecutarse 24/7 en un servidor Windows / Homelab y eliminar por completo la fricción de credenciales entre humanos, agentes de IA (Claude, Antigravity, ChatGPT) y aplicaciones.**
 
 ---
 
@@ -34,7 +34,7 @@
    - [7.3 SDK Python y Emulador Nativo de AWS Secrets Manager (`boto3`)](#73-canal-3-sdk-python-y-emulador-nativo-de-aws-secrets-manager-boto3)
    - [7.4 Panel Web Dark Mode (`/ui`), API REST v1 y OpenAPI 3.1 (ChatGPT)](#74-canal-4-panel-web-dark-mode-ui-api-rest-v1-y-openapi-31-chatgpt)
 8. [Estructura Completa del Proyecto](#8-estructura-completa-del-proyecto)
-9. [Guía de Despliegue en ASUS ROG Ally y Ordenadores de Trabajo](#9-guía-de-despliegue-en-asus-rog-ally-y-ordenadores-de-trabajo)
+9. [Guía de Despliegue en Servidor Windows y Ordenadores de Trabajo](#9-guía-de-despliegue-en-servidor-windows-y-ordenadores-de-trabajo)
 10. [Referencia Completa de la API HTTP](#10-referencia-completa-de-la-api-http)
 11. [Pruebas y Verificación de Calidad](#11-pruebas-y-verificación-de-calidad)
 
@@ -48,8 +48,8 @@ En un flujo de trabajo moderno con múltiples agentes de IA (**Claude Code**, **
 * Pegar contraseñas en el chat contamina el contexto enviado a la nube y deja secretos expuestos en historiales.
 * Esparcir archivos `.env` por decenas de carpetas en distintos ordenadores provoca desincronización cuando se rota una clave.
 
-**MalikSSM** traslada la experiencia exacta de **AWS Secrets Manager + AWS SSO** a tu propia **ASUS ROG Ally**:
-1. **Un único punto de verdad (`malikd.exe`)** corriendo 24/7 en la ROG Ally con consumo mínimo (~12 MB de RAM).
+**MalikSSM** traslada la experiencia exacta de **AWS Secrets Manager + AWS SSO** a tu propio **Servidor Windows / Homelab**:
+1. **Un único punto de verdad (`malikd.exe`)** corriendo 24/7 en tu servidor central con consumo mínimo (~12 MB de RAM).
 2. **Autenticación matutina (`malik login`)**: te autenticas una vez al encender tu PC (o cada 30 días en equipos de confianza) y **todos tus agentes y programas en ese ordenador heredan automáticamente el acceso** sin que tengas que pegar ni un solo token en archivos de configuración.
 3. **Descubrimiento semántico sin exposición**: los agentes pueden buscar qué secretos existen y qué campos contienen (`schema_keys`) antes de pedir su valor o inyectarlos a ciegas en un proceso.
 
@@ -65,7 +65,7 @@ Para construir un gestor de secretos verdaderamente seguro, se descartó Python 
 | **Fuga de claves al disco (`pagefile.sys`)** | Python no bloquea páginas de memoria física de forma nativa; Windows puede volcar la clave maestra al archivo de paginación del SSD. | [`security.LockedKey`](internal/security/memguard.go) invoca directamente la syscall Win32 **`VirtualLock`** (`kernel32.dll`), obligando al kernel de Windows a mantener la Master Key exclusivamente en RAM física. |
 | **Modificación en tiempo de ejecución (*Monkey-Patching*)** | En Python cualquier dependencia puede inspeccionar `gc.get_objects()` o redefinir funciones de validación en caliente. | Binario compilado estáticamente a código máquina nativo (`x86_64`) con tablas de tipos y funciones inmutables. |
 | **Integración con Hardware TPM / DPAPI** | Requiere librerías externas (`pywin32`) y entornos virtuales frágiles. | Syscalls directas a **`CryptProtectData`** y **`CryptUnprotectData`** (`crypt32.dll`) integradas en [`memguard_windows.go`](internal/security/memguard_windows.go). |
-| **Distribución Multi-Ordenador** | Obliga a instalar Python + `venv` + `pip` en la ROG Ally y en cada PC. | Solo existen **2 ejecutables puros** (`malikd.exe` de 7.0 MB y `malik.exe` de 6.3 MB) con cero dependencias externas. |
+| **Distribución Multi-Ordenador** | Obliga a instalar Python + `venv` + `pip` en el servidor y en cada PC. | Solo existen **2 ejecutables puros** (`malikd.exe` de 7.0 MB y `malik.exe` de 6.3 MB) con cero dependencias externas. |
 
 ---
 
@@ -90,19 +90,19 @@ flowchart TB
         TLS["Transporte HTTP/TLS Autenticado\n(Bearer Session / App Token / AWS SigV4)"]
     end
 
-    subgraph ALLY["Servidor Central: ASUS ROG Ally (malikd.exe :8443)"]
+    subgraph SRV["Servidor Central Windows (malikd.exe :8443)"]
         direction TB
         ROUTER["Router Multiprotocolo\nREST v1 + Emulador AWS + OpenAPI 3.1 + SSE"]
         UI["Web UI Dark Mode Embebida (//go:embed)\nGestión Visual + Botón del Pánico + Live Audit"]
         MEMLOCK["Master Key (KEK) en RAM Física\nProtegida con Win32 VirtualLock"]
         ENVELOPE["Motor Criptográfico Envelope\nArgon2id (64MB) + AES-256-GCM + AAD"]
-        TPM_ALLY[("Auto-Unseal Hardware\nWindows DPAPI / TPM 2.0\n(malik.db.unseal)")]
+        TPM_SRV[("Auto-Unseal Hardware\nWindows DPAPI / TPM 2.0\n(malik.db.unseal)")]
         BOLT[("Base de Datos ACID (bbolt)\nmalik.db\n(Secretos + Versiones + Tokens + Auditoría)")]
 
         ROUTER --> UI
         ROUTER --> ENVELOPE
         ENVELOPE <--> MEMLOCK
-        MEMLOCK <--> TPM_ALLY
+        MEMLOCK <--> TPM_SRV
         ENVELOPE <--> BOLT
     end
 
@@ -119,8 +119,8 @@ Al igual que AWS KMS + AWS Secrets Manager, MalikSSM **nunca cifra todos los sec
 
 ```mermaid
 flowchart LR
-    PASS["Master Passphrase\n(Introducida por Edu)"] -->|"Argon2id\n(t=3, m=64MB, p=4 + Salt 16B)"| KEK["Master Key (KEK - 256 bits)\nBloqueada en RAM con VirtualLock"]
-    KEK <-->|"CryptProtectData (DPAPI/TPM)"| UNSEAL["malik.db.unseal\n(Auto-Unseal tras reinicio en ROG Ally)"]
+    PASS["Master Passphrase\n(Contraseña Maestra)"] -->|"Argon2id\n(t=3, m=64MB, p=4 + Salt 16B)"| KEK["Master Key (KEK - 256 bits)\nBloqueada en RAM con VirtualLock"]
+    KEK <-->|"CryptProtectData (DPAPI/TPM)"| UNSEAL["malik.db.unseal\n(Auto-Unseal tras reinicio del servidor)"]
     
     RNG["crypto/rand\n(Generador CSPRNG)"] -->|"Nueva en cada versión"| DEK["Data Encryption Key (DEK)\n256 bits efímera en RAM"]
     
@@ -144,9 +144,9 @@ flowchart LR
    * Al cifrar el secreto se vincula criptográficamente la cadena `payload:<ruta>:v<versión>:<tipo>` como AAD del bloque GCM, y al cifrar la DEK se vincula `dek:<ruta>:v<versión>`.
    * Si alguien manipulara el archivo `malik.db` intentando mover el bloque cifrado de un secreto a otro o suplantar una versión, la verificación matemática de la etiqueta GCM falla en el acto (`ErrTamperedEnvelope`).
 
-### 4.2 Auto-Unseal en la ASUS ROG Ally y Botón del Pánico (`Lock`)
+### 4.2 Auto-Unseal en el Servidor Windows y Botón del Pánico (`Lock`)
 * **Auto-Unseal silencioso tras reinicios**:
-  Cuando activas Auto-Unseal en la ROG Ally, los 32 bytes de la `KEK` se sellan a través del chip de seguridad del sistema mediante la API Win32 `CryptProtectData` con entropía de dominio (`MalikSSM::HardwareDPAPI::v1::ASUS-ROG-Ally` + ruta de la base de datos). Si la ROG Ally se reinicia de madrugada tras una actualización de Windows, `malikd.exe` arranca, desencripta el sobre con el TPM/DPAPI de la máquina y carga la `KEK` en memoria `VirtualLock` sin intervención manual.
+  Cuando activas Auto-Unseal en el servidor, los 32 bytes de la `KEK` se sellan a través del chip de seguridad del sistema mediante la API Win32 `CryptProtectData` con entropía de dominio. Si el servidor se reinicia de madrugada tras una actualización de Windows, `malikd.exe` arranca, desencripta el sobre con el TPM/DPAPI de la máquina y carga la `KEK` en memoria `VirtualLock` sin intervención manual.
 * **Botón del Pánico (`malik lock` o botón rojo en la Web UI)**:
   Ejecuta `LockedKey.Destroy()` (sobrescribe los 32 bytes de la `KEK` en RAM con ceros, libera el `VirtualUnlock`) y revoca instantáneamente todas las sesiones activas en la base de datos.
 
@@ -159,8 +159,8 @@ MalikSSM distingue dos escenarios reales para que la seguridad nunca esté reñi
 ### Escenario A: Tus Ordenadores de Trabajo (Sesiones `mlk_sess_...` selladas con DPAPI)
 * **Objetivo**: Que ni Claude, ni Antigravity, ni tu terminal te pidan tokens ni tengas que editar archivos JSON de configuración cuando caduquen.
 * **Funcionamiento**:
-  1. Ejecutas `malik login --server http://ip-rog-ally:8443` (puedes añadir `--days 30` en tu PC fijo para hacerlo solo una vez al mes).
-  2. La ROG Ally devuelve un token de sesión `mlk_sess_...`.
+  1. Ejecutas `malik login --server http://ip-servidor:8443` (puedes añadir `--days 30` en tu PC fijo para hacerlo solo una vez al mes).
+  2. El servidor devuelve un token de sesión `mlk_sess_...`.
   3. `malik.exe` cifra ese token con el **Windows DPAPI de tu usuario en ese PC** y lo guarda en `%APPDATA%\MalikSSM\session.bin`.
   4. Cuando Claude o Antigravity invocan `malik.exe mcp`, o cuando ejecutas `malik get` / `malik run`, el binario lee y desencripta `%APPDATA%\MalikSSM\session.bin` en memoria automáticamente.
   5. Además, `malik.exe mcp` recarga el archivo `session.bin` en cada llamada a herramienta: si abres Claude primero y haces `malik login` después, **no necesitas reiniciar Claude**.
@@ -180,11 +180,11 @@ Cada secreto en MalikSSM separa **Metadatos de Descubrimiento** (visibles en bú
 
 ```json
 {
-  "path": "servidores/rog-ally/ssh",
-  "arn": "arn:aws:secretsmanager:local:000000000000:secret:servidores/rog-ally/ssh",
+  "path": "servidores/nodo-central/ssh",
+  "arn": "arn:aws:secretsmanager:local:000000000000:secret:servidores/nodo-central/ssh",
   "type": "kv",
-  "description": "SSH principal de la ASUS ROG Ally",
-  "tags": ["local", "rog-ally", "ssh"],
+  "description": "SSH principal del servidor central",
+  "tags": ["local", "infra", "ssh"],
   "schema_keys": ["host", "password", "port", "totp", "username"],
   "current_version": 2,
   "previous_version": 1,
@@ -193,7 +193,7 @@ Cada secreto en MalikSSM separa **Metadatos de Descubrimiento** (visibles en bú
 ```
 
 ### ¿Por qué `schema_keys` es clave para los agentes de IA?
-Cuando Claude o Antigravity buscan `"ssh rog ally"`, reciben inmediatamente `schema_keys: ["host", "password", "port", "totp", "username"]`. Así el agente **sabe con certeza matemática cómo se llaman los campos internos del secreto** sin tener que adivinar si el usuario lo llamó `user`, `username` o `login`.
+Cuando Claude o Antigravity buscan `"ssh servidor"`, reciben inmediatamente `schema_keys: ["host", "password", "port", "totp", "username"]`. Así el agente **sabe con certeza matemática cómo se llaman los campos internos del secreto** sin tener que adivinar si el usuario lo llamó `user`, `username` o `login`.
 
 ### Algoritmo de Puntuación Semántica (`SearchSecrets`)
 El motor de búsqueda tokeniza la consulta del agente (separando espacios, barras, guiones y puntos) y asigna pesos acumulativos:
@@ -219,7 +219,7 @@ Integrado dentro de `malik.exe` siguiendo el estándar JSON-RPC 2.0 sobre `stdio
 | **`secrets_set`** | `path`, `type`, `description`, `tags`, `data`, `value` | Crea un secreto nuevo o rota uno existente incrementando su versión automáticamente. |
 | **`secrets_totp`** | `path` (string) | Calcula en tiempo real el código 2FA TOTP de 6 dígitos (RFC 6238) y los segundos restantes de validez. |
 | **`secrets_exec`** | `secrets` (string[]), `command` (string / string[]) | **Inyección a ciegas**: ejecuta un comando local inyectando los secretos en RAM y censurando (`***REDACTED***`) cualquier contraseña en la salida. |
-| **`vault_status`** | *(ninguno)* | Devuelve el estado de salud, bloqueo, número de secretos y sesiones de la ROG Ally. |
+| **`vault_status`** | *(ninguno)* | Devuelve el estado de salud, bloqueo, número de secretos y sesiones del servidor. |
 
 ### 7.2 Canal 2: CLI Universal e Inyector de Procesos (`malik.exe`)
 Equivalente directo a `aws secretsmanager` con superpoderes añadidos:
@@ -242,7 +242,7 @@ malik get apis/openai/prod --field api_key --raw
 malik get apis/openai/prod --stage AWSPREVIOUS
 
 # 6. Generar código 2FA de 6 dígitos
-malik totp servidores/rog-ally/ssh
+malik totp servidores/nodo-central/ssh
 
 # 7. Inyectar secretos en memoria RAM en cualquier programa sin archivos .env
 malik run -s apis/openai/prod -s db/postgres -- python mi_bot.py
@@ -267,11 +267,11 @@ vault = MalikClient(server_url="http://192.168.1.50:8443")
 resultados = vault.search("ssh")
 
 # Obtener diccionario completo o un campo concreto
-ssh_creds = vault.get("servidores/rog-ally/ssh")
-password  = vault.get("servidores/rog-ally/ssh", field="password")
+ssh_creds = vault.get("servidores/nodo-central/ssh")
+password  = vault.get("servidores/nodo-central/ssh", field="password")
 
 # Obtener código 2FA TOTP de 6 dígitos
-codigo_2fa = vault.totp("servidores/rog-ally/ssh")
+codigo_2fa = vault.totp("servidores/nodo-central/ssh")
 ```
 
 #### B. Usando el SDK oficial de AWS (`boto3`) sin cambiar tu código existente:
@@ -300,9 +300,9 @@ print(resp["SecretString"])
 ## 8. Estructura Completa del Proyecto
 
 ```text
-c:\Users\Edu\Downloads\MalikSSM\
+MalikSSM/
 ├── bin/
-│   ├── malikd.exe                  # Binario nativo del Servidor (ASUS ROG Ally) — 7.08 MB
+│   ├── malikd.exe                  # Binario nativo del Servidor Windows — 7.08 MB
 │   └── malik.exe                   # Binario nativo Cliente + MCP + Inyector — 6.39 MB
 ├── cmd/
 │   ├── malikd/main.go              # Punto de entrada del servidor (flags, señales OS, arranque)
@@ -340,7 +340,7 @@ c:\Users\Edu\Downloads\MalikSSM\
 ├── sdk/
 │   └── python/malik.py             # SDK Python sin dependencias + adaptador automático boto3
 ├── scripts/
-│   ├── install-rog-ally.ps1        # Instalador de tarea de arranque y firewall para la ASUS ROG Ally
+│   ├── install-server.ps1          # Instalador de servicio de arranque y firewall para Servidor Windows
 │   └── init-agents.ps1             # Configurador automático de PATH, MCP y reglas globales en tus PCs
 ├── go.mod
 └── README.md
@@ -348,16 +348,16 @@ c:\Users\Edu\Downloads\MalikSSM\
 
 ---
 
-## 9. Guía de Despliegue en ASUS ROG Ally y Ordenadores de Trabajo
+## 9. Guía de Despliegue en Servidor Windows y Ordenadores de Trabajo
 
-### Paso 1: Despliegue en la ASUS ROG Ally (Servidor 24/7)
-1. Copia la carpeta del proyecto (o únicamente `bin\malikd.exe`, `bin\malik.exe` y `scripts\install-rog-ally.ps1`) a tu ASUS ROG Ally.
-2. Abre PowerShell como Administrador en la ROG Ally y ejecuta:
+### Paso 1: Despliegue en el Servidor Windows (Nodo Central 24/7)
+1. Clona el repositorio o copia `bin\malikd.exe`, `bin\malik.exe` y `scripts\install-server.ps1` a tu servidor Windows.
+2. Abre PowerShell como Administrador en el servidor y ejecuta:
    ```powershell
-   .\scripts\install-rog-ally.ps1 -Port 8443
+   .\scripts\install-server.ps1 -Port 8443
    ```
-   *Esto copia los binarios a `C:\MalikSSM`, abre el puerto TCP `8443` en la red privada/Tailscale y registra la tarea `MalikSSM-ROG-Ally-Daemon` para que arranque automáticamente al iniciar Windows.*
-3. Abre `http://127.0.0.1:8443/ui` en el navegador de la ROG Ally (o desde tu PC usando la IP local/Tailscale de la ROG Ally) e introduce tu **Contraseña Maestra** dejando marcada la casilla **Auto-Unseal con Hardware Windows DPAPI / TPM**.
+   *Esto copia los binarios a `C:\MalikSSM`, abre el puerto TCP `8443` en la red privada/Tailscale y registra la tarea `MalikSSM-Server-Daemon` para que arranque automáticamente al iniciar Windows.*
+3. Abre `http://127.0.0.1:8443/ui` en el navegador del servidor (o desde tu PC usando la IP local/Tailscale del servidor) e introduce tu **Contraseña Maestra** dejando marcada la casilla **Auto-Unseal con Hardware Windows DPAPI / TPM**.
 
 ### Paso 2: Configuración en cada uno de tus Ordenadores (PCs donde usas Claude / Antigravity)
 1. Copia `bin\malik.exe` y `scripts\init-agents.ps1` al ordenador (o clona el repositorio).
@@ -366,9 +366,9 @@ c:\Users\Edu\Downloads\MalikSSM\
    .\scripts\init-agents.ps1
    ```
    *Esto añade `malik.exe` a tu `PATH` de Windows, registra automáticamente el servidor MCP `malik` en Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json`) e inyecta la directriz global en `~/.claude/CLAUDE.md` para que los agentes consulten siempre MalikSSM antes de preguntar.*
-3. Inicia sesión contra la ROG Ally:
+3. Inicia sesión contra el servidor:
    ```powershell
-   malik login --server http://IP-DE-TU-ROG-ALLY:8443 --days 30
+   malik login --server http://IP-DEL-SERVIDOR:8443 --days 30
    ```
 
 ---

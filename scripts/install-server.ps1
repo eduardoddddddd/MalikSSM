@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Instala y registra MalikSSM Server (malikd.exe) en la ASUS ROG Ally para ejecución 24/7 con Auto-Unseal DPAPI/TPM.
+    Instala y registra MalikSSM Server (malikd.exe) en la Windows Server para ejecución 24/7 con Auto-Unseal DPAPI/TPM.
 #>
 param(
     [int]$Port = 8443,
@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $BinDir = Join-Path $RepoRoot "bin"
 
-Write-Host "=== Desplegando MalikSSM Server (malikd.exe) para ASUS ROG Ally ===" -ForegroundColor Cyan
+Write-Host "=== Desplegando MalikSSM Server (malikd.exe) para Windows Server ===" -ForegroundColor Cyan
 
 if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
@@ -30,8 +30,8 @@ if (-not (Get-NetFirewallRule -DisplayName $FwName -ErrorAction SilentlyContinue
     Write-Host "✔ Regla de Firewall creada para el puerto TCP $Port" -ForegroundColor Green
 }
 
-# 2. Tarea Programada de arranque automático en Windows (compatible con DPAPI de tu usuario en la ROG Ally)
-$TaskName = "MalikSSM-ROG-Ally-Daemon"
+# 2. Tarea Programada de arranque automático en Windows (compatible con DPAPI de tu usuario en la Servidor Central)
+$TaskName = "MalikSSM-Win-Server-Daemon"
 $Action = New-ScheduledTaskAction -Execute "$InstallDir\malikd.exe" -Argument "--addr 0.0.0.0:$Port --db `"$InstallDir\data\malik.db`"" -WorkingDirectory $InstallDir
 $TriggerLogon = New-ScheduledTaskTrigger -AtLogOn
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)

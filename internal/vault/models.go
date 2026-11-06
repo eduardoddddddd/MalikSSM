@@ -114,7 +114,7 @@ type AuditEntry struct {
 	Detail    string    `json:"detail,omitempty"`
 }
 
-// VaultStatus summarizes the health and state of the server on the ASUS ROG Ally.
+// VaultStatus summarizes the health and state of the server on the Windows Server.
 type VaultStatus struct {
 	Initialized     bool      `json:"initialized"`
 	Unlocked        bool      `json:"unlocked"`

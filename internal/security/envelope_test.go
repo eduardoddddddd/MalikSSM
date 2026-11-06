@@ -6,7 +6,7 @@ import (
 )
 
 func TestEnvelopeEncryptionAndTamperProtection(t *testing.T) {
-	pass := []byte("SuperSecret-ROG-Ally-Master-Pass-2026!")
+	pass := []byte("SuperSecret-Win-Server-Master-Pass-2026!")
 	meta, kek, err := CreateVaultKeyMeta(pass)
 	if err != nil {
 		t.Fatalf("CreateVaultKeyMeta failed: %v", err)
@@ -21,13 +21,13 @@ func TestEnvelopeEncryptionAndTamperProtection(t *testing.T) {
 	}
 
 	payload := []byte(`{"host":"10.0.0.15","username":"root","password":"ultra_secret_password"}`)
-	blob, err := SealSecret(kek, "servers/rog-ally/ssh", 1, "kv", payload)
+	blob, err := SealSecret(kek, "servers/win-server/ssh", 1, "kv", payload)
 	if err != nil {
 		t.Fatalf("SealSecret failed: %v", err)
 	}
 
 	// Decrypt with matching AAD parameters
-	decrypted, err := OpenSecret(kek, "servers/rog-ally/ssh", 1, "kv", blob)
+	decrypted, err := OpenSecret(kek, "servers/win-server/ssh", 1, "kv", blob)
 	if err != nil {
 		t.Fatalf("OpenSecret failed: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestEnvelopeEncryptionAndTamperProtection(t *testing.T) {
 	}
 
 	// Attempt version rollback attack
-	if _, err := OpenSecret(kek, "servers/rog-ally/ssh", 2, "kv", blob); err == nil {
+	if _, err := OpenSecret(kek, "servers/win-server/ssh", 2, "kv", blob); err == nil {
 		t.Fatalf("expected AAD version tampering attack to fail")
 	}
 
@@ -55,7 +55,7 @@ func TestEnvelopeEncryptionAndTamperProtection(t *testing.T) {
 	if kek.IsUnlocked() {
 		t.Fatalf("expected LockedKey to report locked after Destroy()")
 	}
-	if _, err := OpenSecret(kek, "servers/rog-ally/ssh", 1, "kv", blob); err != ErrVaultLocked {
+	if _, err := OpenSecret(kek, "servers/win-server/ssh", 1, "kv", blob); err != ErrVaultLocked {
 		t.Fatalf("expected ErrVaultLocked after Destroy(), got %v", err)
 	}
 }

@@ -48,4 +48,4 @@ $ClaudeJson["mcpServers"]["malik"] = @{
 $ClaudeJson | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfigPath -Encoding UTF8
 Write-Host "✔ Servidor MCP 'malik' registrado en Claude Desktop: $ClaudeConfigPath" -ForegroundColor Green
 
-Write-Host "`nListo. Ahora solo tienes que hacer 'malik login' por la mañana y todos tus agentes hablarán con la ROG Ally." -ForegroundColor Cyan
+Write-Host "`nListo. Ahora solo tienes que hacer 'malik login' por la mañana y todos tus agentes hablarán con la Servidor Central." -ForegroundColor Cyan

@@ -75,7 +75,7 @@ func OpenStore(dbPath string) (*Store, error) {
 		subscribers: make(map[chan AuditEntry]struct{}),
 	}
 
-	// If Hardware DPAPI Auto-Unseal file exists on the ROG Ally, unseal into VirtualLocked RAM automatically.
+	// If Hardware DPAPI Auto-Unseal file exists on the Servidor Central, unseal into VirtualLocked RAM automatically.
 	_ = s.TryAutoUnseal()
 
 	return s, nil
