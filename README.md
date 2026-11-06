@@ -1,5 +1,21 @@
 # 🛡️ MalikSSM — Agent-First Secrets & Session Manager
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.26_Native_(CGO__0)-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go 1.26 Native" />
+  <img src="https://img.shields.io/badge/Crypto-AES--256--GCM_%2B_Argon2id-10B981?style=for-the-badge&logo=letsencrypt&logoColor=white" alt="AES-256-GCM + Argon2id" />
+  <img src="https://img.shields.io/badge/RAM_Guard-Win32_VirtualLock_%2B_Zeroize-EF4444?style=for-the-badge&logo=windows&logoColor=white" alt="VirtualLock + Zeroize" />
+  <img src="https://img.shields.io/badge/Hardware-DPAPI_%2F_TPM_2.0_Auto--Unseal-8B5CF6?style=for-the-badge&logo=amd&logoColor=white" alt="DPAPI TPM 2.0" />
+</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/MCP_Server-Claude_%26_Antigravity_Ready-F59E0B?style=flat-square&logo=anthropic&logoColor=white" alt="MCP Ready" />
+  <img src="https://img.shields.io/badge/AWS_Emulator-Boto3_SecretsManager_Compatible-FF9900?style=flat-square&logo=amazonwebservices&logoColor=white" alt="AWS Boto3 Compatible" />
+  <img src="https://img.shields.io/badge/ChatGPT_Actions-OpenAPI_3.1-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAPI 3.1" />
+  <img src="https://img.shields.io/badge/2FA-RFC_6238_TOTP_Generator-06B6D4?style=flat-square&logo=googleauthenticator&logoColor=white" alt="TOTP 2FA" />
+  <img src="https://img.shields.io/badge/Storage-bbolt_ACID-3B82F6?style=flat-square&logo=databricks&logoColor=white" alt="bbolt ACID" />
+  <img src="https://img.shields.io/badge/Target_Node-ASUS_ROG_Ally_24%2F7-E11D48?style=flat-square&logo=asus&logoColor=white" alt="ASUS ROG Ally" />
+  <img src="https://img.shields.io/badge/Tests-Passing_100%25-22C55E?style=flat-square&logo=checkmarx&logoColor=white" alt="Tests Passing" />
+</p>
+
 > **Infraestructura criptográfica de gestión de secretos y sesiones de grado industrial escrita en Go 1.26 nativo (`CGO_ENABLED=0`), diseñada para ejecutarse 24/7 en tu ASUS ROG Ally y eliminar por completo la fricción de credenciales entre humanos, agentes de IA (Claude, Antigravity, ChatGPT) y aplicaciones.**
 
 ---
