@@ -20,7 +20,7 @@ func TestParseSetArgs(t *testing.T) {
 	}
 
 	data, value, err := parseSetArgs([]string{
-		"host=100.97.117.41",
+		"host=100.64.0.10",
 		"password=?",
 		`key=@C:\keys\sa.json`,
 		"handle=@@malik",
@@ -32,7 +32,7 @@ func TestParseSetArgs(t *testing.T) {
 		t.Fatalf("unexpected plain value %q", value)
 	}
 	want := map[string]string{
-		"host":     "100.97.117.41",
+		"host":     "100.64.0.10",
 		"password": "S3cret-typed",
 		"key":      `{"type":"service_account"}`,
 		"handle":   "@malik",
@@ -59,8 +59,8 @@ func TestParseSetArgs(t *testing.T) {
 }
 
 func TestReorderFlagsKeepsBoolFlagsFromEatingPositionals(t *testing.T) {
-	got := reorderFlagsFirst([]string{"servidores/rogally/ssh", "--merge", "password=?", "--tags", "ssh,rogally"})
-	want := []string{"--merge", "--tags", "ssh,rogally", "servidores/rogally/ssh", "password=?"}
+	got := reorderFlagsFirst([]string{"servidores/web01/ssh", "--merge", "password=?", "--tags", "ssh,web01"})
+	want := []string{"--merge", "--tags", "ssh,web01", "servidores/web01/ssh", "password=?"}
 	if len(got) != len(want) {
 		t.Fatalf("want %v, got %v", want, got)
 	}

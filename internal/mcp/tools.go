@@ -78,7 +78,7 @@ func toolDefinitions() []map[string]any {
 					},
 					"blind_only": map[string]any{
 						"type":        "boolean",
-						"description": "If true, secrets_get never returns this secret's values to agents; it can only be used through secrets_exec. Omit to keep the current setting when rotating.",
+						"description": "If true, secrets_get never returns this secret's values to agents; it can only be used through secrets_exec. New secrets are blind by default; pass false only for values an agent must read. Omit to keep the current setting when rotating.",
 					},
 				},
 			},
@@ -111,6 +111,32 @@ func toolDefinitions() []map[string]any {
 					},
 					"command": map[string]any{
 						"description": "Command string or array of arguments to execute (supports {{SECRET:path#field}} inline placeholders).",
+					},
+				},
+			},
+		},
+		{
+			"name":        "remote_exec",
+			"description": "Run a command on a machine stored in MalikSSM (like AWS SSM send-command). MalikSSM looks up the target's host, user and SSH key or password in the vault, connects over SSH (host key verified), runs the command and returns stdout/stderr/exit_code with any credential redacted. You never see or handle the credentials. Use this instead of fetching passwords with secrets_get. Windows targets usually run PowerShell; for multi-line scripts pass them in 'stdin' with command 'powershell -NoProfile -Command -' (Windows) or 'bash -s' (Linux/macOS).",
+			"inputSchema": map[string]any{
+				"type":     "object",
+				"required": []string{"target", "command"},
+				"properties": map[string]any{
+					"target": map[string]any{
+						"type":        "string",
+						"description": "Machine name (e.g. 'web01'; resolved from servidores/<name>/ssh, equipos/<name>/ssh and equipos/<name>/admin) or an exact secret path.",
+					},
+					"command": map[string]any{
+						"type":        "string",
+						"description": "Command line executed by the remote user's default shell.",
+					},
+					"stdin": map[string]any{
+						"type":        "string",
+						"description": "Optional data sent to the command's stdin (e.g. a script).",
+					},
+					"timeout_seconds": map[string]any{
+						"type":        "number",
+						"description": "Optional timeout (default 60).",
 					},
 				},
 			},

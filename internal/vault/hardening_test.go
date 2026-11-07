@@ -130,3 +130,19 @@ func TestConcurrentReadsDoNotLoseRotations(t *testing.T) {
 		t.Fatalf("expected latest value %q, got %q", want, sec.Data["password"])
 	}
 }
+
+func TestNewSecretsAreBlindByDefault(t *testing.T) {
+	store, caller := newUnlockedStore(t)
+	meta, err := store.PutSecret(caller, PutSecretInput{Path: "equipos/pc/admin", Data: map[string]string{"username": "u", "password": "p"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !meta.BlindOnly {
+		t.Fatalf("new secrets must be blind by default")
+	}
+	visible := false
+	meta, err = store.PutSecret(caller, PutSecretInput{Path: "apis/public-endpoint", Value: "https://example.com", BlindOnly: &visible})
+	if err != nil || meta.BlindOnly {
+		t.Fatalf("explicit blind_only=false must create a readable secret, got %+v err=%v", meta, err)
+	}
+}

@@ -34,6 +34,7 @@
    - [8.2 CLI Universal e Inyector de Procesos (`malik`)](#82-canal-2-cli-universal-e-inyector-de-procesos-malik)
    - [8.3 SDK Python Multiplataforma y Emulador Nativo de AWS Secrets Manager (`boto3`)](#83-canal-3-sdk-python-multiplataforma-y-emulador-nativo-de-aws-secrets-manager-boto3)
    - [8.4 Panel Web Dark Mode (`/ui`), API REST v1 y OpenAPI 3.1 (ChatGPT)](#84-canal-4-panel-web-dark-mode-ui-api-rest-v1-y-openapi-31-chatgpt)
+   - [8.5 Operativa con Agentes: Acciones, no Contraseñas (como AWS SSM)](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm)
 9. [Estructura Completa del Proyecto](#9-estructura-completa-del-proyecto)
 10. [Guía de Instalación Paso a Paso (Windows, macOS y Linux)](#10-guía-de-instalación-paso-a-paso-windows-macos-y-linux)
 11. [Referencia Completa de la API HTTP](#11-referencia-completa-de-la-api-http)
@@ -215,7 +216,7 @@ Cada secreto en MalikSSM separa **Metadatos de Descubrimiento** (visibles en bú
 ## 8. Los 4 Canales de Consumo Universal
 
 ### 8.1 Canal 1: Servidor MCP Nativo (`malik mcp`)
-Integrado dentro del binario `malik` en Windows, macOS y Linux siguiendo el estándar JSON-RPC 2.0 sobre `stdio`. Expone **6 herramientas nativas** para Claude Desktop, Claude Code y Antigravity:
+Integrado dentro del binario `malik` en Windows, macOS y Linux siguiendo el estándar JSON-RPC 2.0 sobre `stdio`. Expone **7 herramientas nativas** para Claude Desktop, Claude Code y Antigravity:
 
 | Herramienta MCP | Argumentos Principales | Qué hace |
 | :--- | :--- | :--- |
@@ -224,6 +225,7 @@ Integrado dentro del binario `malik` en Windows, macOS y Linux siguiendo el est�
 | **`secrets_set`** | `path`, `type`, `description`, `tags`, `data`, `value`, `blind_only` | Crea un secreto nuevo o rota uno existente incrementando su versión. Si se omite `blind_only` al rotar, se conserva el valor actual. |
 | **`secrets_totp`** | `path` (string) | Calcula en tiempo real el código 2FA TOTP de 6 dígitos (RFC 6238) y los segundos restantes de validez. |
 | **`secrets_exec`** | `secrets` (string[]), `command` (string / string[]) | **Inyección a ciegas**: ejecuta un comando local inyectando los secretos en RAM y censurando (`***REDACTED***`) cualquier contraseña en la salida. |
+| **`remote_exec`** | `target` (string), `command` (string), `stdin` (opc.), `timeout_seconds` (opc.) | **Acción remota (como AWS SSM `send-command`)**: ejecuta un comando en un equipo de la bóveda por SSH con su clave/contraseña, sin devolver nunca las credenciales. Ver [8.5](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm). |
 | **`vault_status`** | *(ninguno)* | Devuelve el estado de salud, bloqueo, número de secretos y sesiones del servidor. |
 
 ### 8.2 Canal 2: CLI Universal e Inyector de Procesos (`malik`)
@@ -258,6 +260,9 @@ malik run -s apis/openai/prod -s db/postgres -- python3 mi_bot.py
 
 # 8. Usar placeholders en línea dentro de comandos (se censuran en stdout/stderr)
 malik run -- curl -H "Authorization: Bearer {{SECRET:apis/openai/prod#api_key}}" https://api.openai.com/v1/models
+
+# 9. Ejecutar en un equipo de la bóveda sin ver sus credenciales (como aws ssm send-command)
+malik ssh web01 -- uptime
 ```
 
 ### 8.3 Canal 3: SDK Python Multiplataforma y Emulador Nativo de AWS Secrets Manager (`boto3`)
@@ -282,6 +287,57 @@ print(sm.get_secret_value(SecretId="apis/openai/prod")["SecretString"])
 ### 8.4 Canal 4: Panel Web Dark Mode (`/ui`), API REST v1 y OpenAPI 3.1 (ChatGPT)
 * **Panel Web (`/ui`)**: Incrustado dentro de `malikd.exe` y `malikd-linux-amd64`. Accesible desde cualquier navegador en escritorio o móvil.
 * **ChatGPT Custom GPT Actions (`/openapi.json`)**: Sirve dinámicamente el esquema OpenAPI 3.1.0 listo para importar en un GPT privado de ChatGPT.
+
+---
+
+## 8.5 Operativa con Agentes: Acciones, no Contraseñas (como AWS SSM)
+
+Con AWS, un agente **nunca maneja un secreto**: pide una acción (`aws ssm send-command`, `aws ssm start-session`) y la herramienta se autentica por dentro con la identidad ya iniciada (SSO / rol IAM). MalikSSM funciona igual:
+
+| Lo que quiere el agente | Qué usa | Qué ve el agente |
+| :--- | :--- | :--- |
+| Saber qué credenciales/equipos existen | `secrets_search` / `malik search` | Rutas, descripción, tags, nombres de campos |
+| Ejecutar algo en una máquina | **`remote_exec`** / **`malik ssh <equipo> -- <cmd>`** | Solo stdout/stderr/exit code (censurados) |
+| Ejecutar algo local que necesita un secreto | `secrets_exec` / `malik run -s <ruta> -- <cmd>` | Solo la salida (censurada) |
+| Datos de conexión (host, puerto, usuario) | `secrets_get` | Metadatos; los campos sensibles salen `***BLIND***` |
+
+**Por qué importa:** los sistemas de permisos de los agentes (por ejemplo el modo automático de Claude Code) bloquean, con razón, que un agente **extraiga una contraseña** y la use por su cuenta («credential materialization»). Si el agente solo pide acciones, no hay nada que bloquear y **no hace falta desactivar los permisos**.
+
+### Cómo se resuelve un equipo
+`remote_exec {target: "web01"}` combina, por este orden, las entradas que existan:
+
+1. `servidores/web01/ssh`: normalmente `host`, `port`, `username`, `identity_file` (ruta a la clave en el equipo cliente).
+2. `equipos/web01/ssh`.
+3. `equipos/web01/admin`: normalmente `username` + `password` (contraseña de administrador).
+
+Se conecta por SSH (clave primero, contraseña después) con verificación de la huella del servidor: se usa tu `~/.ssh/known_hosts`, un equipo nuevo se registra la primera vez (TOFU, en el `known_hosts` de MalikSSM) y **una huella que cambia se rechaza**. Las credenciales se censuran de la salida.
+
+```bash
+# Alta de un equipo (los valores sensibles se piden sin eco)
+malik set equipos/web01/admin host=100.64.0.10 username=admin password=? --desc "Servidor web01 (Linux)" --tags "equipo,linux,web01"
+
+# Uso (persona o agente)
+malik ssh web01 -- uptime
+malik ssh web01 --stdin-file deploy.sh -- bash -s
+malik ssh winserver -- 'Get-Service sshd'          # Windows OpenSSH: el comando lo ejecuta PowerShell
+```
+
+### Permisos recomendados (en vez de «omitir permisos»)
+Igual que autorizas `aws` una vez, `malik init-agents` ofrece añadir estas reglas a `~/.claude/settings.json` (pregunta antes; con `--claude-permissions` las añade sin preguntar, con `--no-claude-permissions` no toca nada):
+
+```json
+"permissions": { "allow": [
+  "mcp__malik__secrets_search", "mcp__malik__vault_status",
+  "mcp__malik__remote_exec", "mcp__malik__secrets_exec",
+  "Bash(malik ssh *)", "Bash(malik search *)", "Bash(malik ls*)", "Bash(malik status*)",
+  "PowerShell(malik ssh *)", "PowerShell(malik search *)", "PowerShell(malik ls*)", "PowerShell(malik status*)"
+] }
+```
+
+`secrets_get`, `malik get` y `secrets_totp` (devuelven valores) **no** se incluyen: siguen pidiendo confirmación. Ten en cuenta que autorizar `remote_exec` / `malik ssh` equivale a autorizar `aws ssm send-command`: el agente podrá ejecutar comandos en los equipos que tengas en la bóveda.
+
+### Secretos `blind` por defecto
+Todo secreto nuevo nace `blind_only`: los agentes lo usan a través de `remote_exec` / `secrets_exec`, pero `secrets_get` nunca devuelve sus valores. Para un valor que un agente sí deba leer (una URL pública, un ID no sensible) créalo con `--blind=false`.
 
 ---
 
@@ -327,6 +383,10 @@ MalikSSM/
 │   ├── client/
 │   │   ├── config.go               # Gestión multiplataforma de session.bin (Windows, macOS y Linux)
 │   │   └── api_client.go           # Cliente HTTP tipado con atribución de agente (X-Malik-Agent)
+│   ├── remote/
+│   │   └── remote.go               # Acciones remotas por SSH (malik ssh / remote_exec) con known_hosts + TOFU
+│   ├── agentcfg/
+│   │   └── claude.go               # init-agents: MCP en Claude Desktop/Code, permisos acotados y regla CLAUDE.md
 │   ├── injector/
 │   │   └── runner.go               # Inyección de secretos en subprocesos y censura en vivo (***REDACTED***)
 │   └── mcp/
@@ -354,7 +414,7 @@ Elige una de estas tres opciones para dar servicio a tus otros equipos:
 | Opción | Cuándo | Ejemplo |
 | :--- | :--- | :--- |
 | IP de **Tailscale** + `--insecure-http` | Recomendado: WireGuard ya cifra el tráfico | `--addr 100.x.y.z:8443 --insecure-http` |
-| IP de LAN + **TLS** | Sin Tailscale | `--addr 192.168.1.13:8443 --tls-cert cert.pem --tls-key key.pem` |
+| IP de LAN + **TLS** | Sin Tailscale | `--addr 192.168.1.50:8443 --tls-cert cert.pem --tls-key key.pem` |
 | Solo `127.0.0.1` | Servidor y agentes en el mismo equipo | (por defecto) |
 
 * **En Servidor Windows** (p. ej. un mini-PC o portátil siempre encendido). Instala una tarea programada que arranca `malikd` como **SYSTEM al iniciar Windows**, sin sesión iniciada; reintenta cada minuto si la IP de Tailscale aún no está lista. Log en `C:MalikSSMdatamalikd.log`. Para inicializar por SSH: `powershell -File C:MalikSSMinit-vault.ps1 -Server http://100.x.y.z:8443`.
@@ -393,7 +453,9 @@ Las peticiones remotas a `/v1/system/init`, o un primer `login` remoto, reciben 
    *Qué hace automáticamente en tu Mac*:
    * Detecta si tu Mac es **Apple Silicon (`arm64`)** o **Intel (`amd64`)** e instala el binario nativo en `/usr/local/bin/malik` (o `~/.local/bin/malik`).
    * Registra el servidor MCP `malik` en **Claude Desktop para macOS** (`~/Library/Application Support/Claude/claude_desktop_config.json`).
-   * Añade el protocolo global anti-preguntas en `~/.claude/CLAUDE.md`.
+   * Registra el MCP en **Claude Code** (`claude mcp add --scope user`), si está instalado.
+   * Escribe la regla para agentes en `~/.claude/CLAUDE.md` (bloque gestionado que se actualiza solo).
+   * Te ofrece añadir los [permisos acotados](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm) a `~/.claude/settings.json`.
 2. Inicia sesión contra tu servidor:
    ```bash
    malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30
@@ -409,7 +471,7 @@ Las peticiones remotas a `/v1/system/init`, o un primer `login` remoto, reciben 
    ```
    *Qué hace automáticamente en Linux*:
    * Detecta si tu arquitectura es `x86_64` (`amd64`) o `aarch64` (`arm64`) e instala `malik` en `/usr/local/bin/malik` o `~/.local/bin/malik`.
-   * Registra el servidor MCP en `~/.config/Claude/claude_desktop_config.json` y la regla global en `~/.claude/CLAUDE.md`.
+   * Registra el servidor MCP en `~/.config/Claude/claude_desktop_config.json` y en Claude Code, escribe la regla para agentes en `~/.claude/CLAUDE.md` y te ofrece los [permisos acotados](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm).
 2. Inicia sesión contra tu servidor:
    ```bash
    malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30
@@ -422,6 +484,7 @@ Las peticiones remotas a `/v1/system/init`, o un primer `login` remoto, reciben 
    ```powershell
    .\scripts\init-agents.ps1
    ```
+   Añade `malik.exe` al PATH, registra el MCP en Claude Desktop y Claude Code (conservando tus otros servidores, con copia previa), escribe la regla para agentes y te ofrece los [permisos acotados](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm).
 2. Inicia sesión contra tu servidor:
    ```powershell
    malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30

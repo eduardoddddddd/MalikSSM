@@ -28,30 +28,30 @@ func TestSecretsGetMasksBlindOnlySecrets(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 	api := client.New(ts.URL, sess.Token, "test")
-	blind := true
+	blind, notBlind := true, false
 	if _, err := api.PutSecret(vault.PutSecretInput{
-		Path:      "servidores/rogally/ssh",
-		Data:      map[string]string{"host": "192.168.1.13", "username": "edu", "password": "TopSecret-123"},
+		Path:      "servidores/web01/ssh",
+		Data:      map[string]string{"host": "10.0.0.21", "username": "edu", "password": "TopSecret-123"},
 		BlindOnly: &blind,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := api.PutSecret(vault.PutSecretInput{Path: "apis/demo", Value: "Visible-Value-456"}); err != nil {
+	if _, err := api.PutSecret(vault.PutSecretInput{Path: "apis/demo", Value: "Visible-Value-456", BlindOnly: &notBlind}); err != nil {
 		t.Fatal(err)
 	}
 
 	mcpSrv := NewServer(ts.URL, sess.Token, "claude")
 
-	out, isErr := mcpSrv.executeTool("secrets_get", map[string]any{"path": "servidores/rogally/ssh"})
-	if isErr || strings.Contains(out, "TopSecret-123") || !strings.Contains(out, "192.168.1.13") {
+	out, isErr := mcpSrv.executeTool("secrets_get", map[string]any{"path": "servidores/web01/ssh"})
+	if isErr || strings.Contains(out, "TopSecret-123") || !strings.Contains(out, "10.0.0.21") {
 		t.Fatalf("blind secret: password must be masked and host visible, got isErr=%v\n%s", isErr, out)
 	}
-	out, isErr = mcpSrv.executeTool("secrets_get", map[string]any{"path": "servidores/rogally/ssh", "field": "password"})
+	out, isErr = mcpSrv.executeTool("secrets_get", map[string]any{"path": "servidores/web01/ssh", "field": "password"})
 	if !isErr || strings.Contains(out, "TopSecret-123") || !strings.Contains(out, "secrets_exec") {
 		t.Fatalf("blind field request must be refused with a secrets_exec hint, got isErr=%v\n%s", isErr, out)
 	}
-	out, isErr = mcpSrv.executeTool("secrets_get", map[string]any{"path": "servidores/rogally/ssh", "field": "host"})
-	if isErr || !strings.Contains(out, "192.168.1.13") {
+	out, isErr = mcpSrv.executeTool("secrets_get", map[string]any{"path": "servidores/web01/ssh", "field": "host"})
+	if isErr || !strings.Contains(out, "10.0.0.21") {
 		t.Fatalf("public field of a blind secret should be readable, got isErr=%v\n%s", isErr, out)
 	}
 

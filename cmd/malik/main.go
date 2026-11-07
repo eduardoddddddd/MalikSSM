@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/malikssm/malik/internal/client"
 	"github.com/malikssm/malik/internal/injector"
 	"github.com/malikssm/malik/internal/mcp"
+	"github.com/malikssm/malik/internal/remote"
 	"github.com/malikssm/malik/internal/security"
 	"github.com/malikssm/malik/internal/vault"
 	"golang.org/x/term"
@@ -61,6 +63,8 @@ func main() {
 		runTOTP(args)
 	case "run", "exec":
 		runExec(args)
+	case "ssh", "remote":
+		runSSH(args)
 	case "token", "tokens":
 		runToken(args)
 	case "audit", "logs":
@@ -265,7 +269,7 @@ func runSet(args []string) {
 	desc := fs.String("desc", "", "Semantic description for AI agents")
 	tags := fs.String("tags", "", "Comma-separated tags")
 	val := fs.String("value", "", "Plain string secret value")
-	blind := fs.Bool("blind", false, "Blind-only: agents can use it via secrets_exec but secrets_get never returns its values (--blind=false to clear)")
+	blind := fs.Bool("blind", false, "Blind-only (default for new secrets): agents use it via remote_exec/secrets_exec but secrets_get never returns its values; --blind=false makes it readable")
 	merge := fs.Bool("merge", false, "Keep the current fields and only add/replace the ones given")
 	_ = fs.Parse(reorderFlagsFirst(args))
 
@@ -404,6 +408,69 @@ func runExec(args []string) {
 	os.Exit(res.ExitCode)
 }
 
+// runSSH runs a command on a machine stored in the vault (like `aws ssm send-command`): the
+// credentials are resolved and used inside this process and never printed.
+func runSSH(args []string) {
+	fs := flag.NewFlagSet("ssh", flag.ExitOnError)
+	srv := fs.String("server", "", "Server URL override")
+	tok := fs.String("token", "", "Token override")
+	timeout := fs.Int("timeout", 60, "Timeout in seconds")
+	stdinFile := fs.String("stdin-file", "", "File sent to the remote command's stdin (e.g. a script for 'powershell -Command -' or 'bash -s')")
+	jsonOut := fs.Bool("json", false, "Print the full result as JSON")
+
+	before, cmdParts := args, []string(nil)
+	for i, a := range args {
+		if a == "--" {
+			before, cmdParts = args[:i], args[i+1:]
+			break
+		}
+	}
+	_ = fs.Parse(reorderFlagsFirst(before))
+	if fs.NArg() == 0 {
+		fatal("Uso: malik ssh <equipo|ruta> [--timeout 60] [--stdin-file script] -- <comando>")
+	}
+	target := fs.Arg(0)
+	if cmdParts == nil {
+		cmdParts = fs.Args()[1:]
+	}
+	command := strings.Join(cmdParts, " ")
+	if strings.TrimSpace(command) == "" {
+		fatal("Falta el comando: malik ssh %s -- <comando>", target)
+	}
+	stdin := ""
+	if *stdinFile != "" {
+		raw, err := os.ReadFile(*stdinFile)
+		if err != nil {
+			fatal("No se pudo leer %s: %v", *stdinFile, err)
+		}
+		stdin = string(raw)
+	}
+
+	api := client.New(*srv, *tok, "malik-ssh")
+	t, err := remote.Resolve(api, target)
+	if err != nil {
+		fatal("%v", err)
+	}
+	res, err := remote.Run(context.Background(), t, remote.Options{
+		Command:         command,
+		Stdin:           stdin,
+		Timeout:         time.Duration(*timeout) * time.Second,
+		KnownHostsFiles: remote.DefaultKnownHostsFiles(),
+		TOFUFile:        filepath.Join(client.ConfigDir(), "known_hosts"),
+	})
+	if err != nil {
+		fatal("%v", err)
+	}
+	if *jsonOut {
+		out, _ := json.MarshalIndent(res, "", "  ")
+		fmt.Println(string(out))
+	} else {
+		fmt.Print(res.Stdout)
+		fmt.Fprint(os.Stderr, res.Stderr)
+	}
+	os.Exit(res.ExitCode)
+}
+
 func runToken(args []string) {
 	if len(args) == 0 {
 		fatal("Usage: malik token [create|ls|revoke]")
@@ -522,6 +589,9 @@ func runInitAgents(args []string) {
 	fs := flag.NewFlagSet("init-agents", flag.ExitOnError)
 	desktopCfg := fs.String("claude-desktop-config", "", "Ruta de claude_desktop_config.json (por defecto la del sistema operativo)")
 	skipDesktop := fs.Bool("skip-claude-desktop", false, "No registrar el MCP en Claude Desktop")
+	skipCode := fs.Bool("skip-claude-code", false, "No registrar el MCP en Claude Code (claude mcp add)")
+	permsYes := fs.Bool("claude-permissions", false, "Añadir sin preguntar los permisos acotados de MalikSSM a ~/.claude/settings.json")
+	permsNo := fs.Bool("no-claude-permissions", false, "No tocar los permisos de Claude Code")
 	_ = fs.Parse(args)
 
 	exePath, err := os.Executable()
@@ -530,41 +600,90 @@ func runInitAgents(args []string) {
 	}
 	exePath, _ = filepath.Abs(exePath)
 
+	fmt.Println("✔ Configurando agentes para MalikSSM")
+	fmt.Printf("  Binario MCP   : %s mcp\n", exePath)
+
+	// 1. Regla para los agentes en ~/.claude/CLAUDE.md (bloque gestionado, se actualiza en cada ejecución)
 	home, _ := os.UserHomeDir()
 	claudeMD := filepath.Join(home, ".claude", "CLAUDE.md")
-	_ = os.MkdirAll(filepath.Dir(claudeMD), 0700)
-
-	ruleBlock := "\n# MalikSSM — Protocolo Global de Credenciales y Secretos\n" +
-		"- NUNCA pidas al usuario contraseñas, API keys, tokens, usuarios, puertos ni IPs por chat.\n" +
-		"- Siempre que necesites una credencial, ejecuta primero la herramienta MCP `secrets_search` o el comando `malik search <término>`.\n" +
-		"- Para leer un secreto usa `secrets_get` (o `malik get <ruta>`), para 2FA usa `secrets_totp`, y para inyectar credenciales en procesos usa `secrets_exec` (`malik run`).\n" +
-		"- Cuando crees una contraseña o API key nueva, guárdala automáticamente en MalikSSM con `secrets_set`.\n"
-
-	existingMD, _ := os.ReadFile(claudeMD)
-	if !strings.Contains(string(existingMD), "MalikSSM") {
-		_ = os.WriteFile(claudeMD, append(existingMD, []byte(ruleBlock)...), 0600)
+	if changed, err := agentcfg.UpsertRuleBlock(claudeMD); err != nil {
+		fmt.Fprintf(os.Stderr, "  ⚠ No se pudo actualizar %s: %v\n", claudeMD, err)
+	} else if changed {
+		fmt.Printf("  Regla agentes : %s (actualizada)\n", claudeMD)
+	} else {
+		fmt.Printf("  Regla agentes : %s (ya al día)\n", claudeMD)
 	}
 
-	fmt.Println("✔ Agentes configurados con protocolo Zero-Nagging MalikSSM:")
-	fmt.Printf("  Binario MCP : %s mcp\n", exePath)
-	fmt.Printf("  Regla Global: %s\n", claudeMD)
+	// 2. MCP en Claude Desktop
+	if !*skipDesktop {
+		cfgPath := *desktopCfg
+		if cfgPath == "" {
+			cfgPath = agentcfg.ClaudeDesktopConfigPath()
+		}
+		backup, err := agentcfg.RegisterMCPServer(cfgPath, "malik", exePath, []string{"mcp", "--caller", "claude-desktop"})
+		if err != nil {
+			fatal("No se registró el MCP en Claude Desktop: %v", err)
+		}
+		fmt.Printf("  Claude Desktop: %s (resto de servidores MCP conservados)\n", cfgPath)
+		if backup != "" {
+			fmt.Printf("  Copia previa  : %s\n", backup)
+		}
+	}
 
-	if *skipDesktop {
+	// 3. MCP en Claude Code
+	if !*skipCode {
+		registerClaudeCodeMCP(exePath)
+	}
+
+	// 4. Permisos acotados (como autorizar `aws` una vez): solo descubrir, estado y las herramientas
+	//    que usan credenciales sin devolverlas. Nunca "omitir permisos".
+	settings := agentcfg.ClaudeCodeSettingsPath()
+	apply := *permsYes
+	if !apply && !*permsNo && term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Println("\n  Permisos recomendados para que los agentes usen MalikSSM sin preguntarte cada vez:")
+		for _, r := range agentcfg.AgentAllowRules {
+			fmt.Printf("    + %s\n", r)
+		}
+		fmt.Println("    (secrets_get, malik get y secrets_totp seguirán pidiendo confirmación)")
+		fmt.Printf("  ¿Añadirlos a %s? [s/N]: ", settings)
+		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		answer := strings.ToLower(strings.TrimSpace(line))
+		apply = strings.HasPrefix(answer, "s") || strings.HasPrefix(answer, "y")
+	}
+	if apply {
+		added, backup, err := agentcfg.AddAllowRules(settings, agentcfg.AgentAllowRules)
+		switch {
+		case err != nil:
+			fmt.Fprintf(os.Stderr, "  ⚠ No se pudieron añadir los permisos: %v\n", err)
+		case len(added) == 0:
+			fmt.Printf("  Permisos      : %s (ya estaban)\n", settings)
+		default:
+			fmt.Printf("  Permisos      : %d reglas añadidas a %s\n", len(added), settings)
+			if backup != "" {
+				fmt.Printf("  Copia previa  : %s\n", backup)
+			}
+		}
+	} else if !*permsNo {
+		fmt.Println("  Permisos      : sin cambios (usa --claude-permissions para añadirlos)")
+	}
+}
+
+// registerClaudeCodeMCP runs `claude mcp add --scope user malik ...` when the Claude Code CLI is installed.
+func registerClaudeCodeMCP(exePath string) {
+	claudeBin, err := exec.LookPath("claude")
+	if err != nil {
+		fmt.Printf("  Claude Code   : no encontrado; regístralo con: claude mcp add --scope user malik -- \"%s\" mcp --caller claude-code\n", exePath)
 		return
 	}
-	cfgPath := *desktopCfg
-	if cfgPath == "" {
-		cfgPath = agentcfg.ClaudeDesktopConfigPath()
+	out, err := exec.Command(claudeBin, "mcp", "add", "--scope", "user", "malik", "--", exePath, "mcp", "--caller", "claude-code").CombinedOutput()
+	switch {
+	case err == nil:
+		fmt.Println("  Claude Code   : MCP 'malik' registrado (scope user)")
+	case strings.Contains(strings.ToLower(string(out)), "already exists"):
+		fmt.Println("  Claude Code   : MCP 'malik' ya estaba registrado")
+	default:
+		fmt.Printf("  Claude Code   : ⚠ claude mcp add falló: %s\n", strings.TrimSpace(string(out)))
 	}
-	backup, err := agentcfg.RegisterMCPServer(cfgPath, "malik", exePath, []string{"mcp", "--caller", "claude-desktop"})
-	if err != nil {
-		fatal("No se registró el MCP en Claude Desktop: %v", err)
-	}
-	fmt.Printf("  Claude Desktop: %s (resto de servidores MCP conservados)\n", cfgPath)
-	if backup != "" {
-		fmt.Printf("  Copia previa  : %s\n", backup)
-	}
-	fmt.Printf("  Claude Code   : claude mcp add --scope user malik -- \"%s\" mcp --caller claude-code\n", exePath)
 }
 
 // reorderFlagsFirst moves --flag arguments before positional arguments so Go's flag package parses them in any order.
@@ -679,10 +798,11 @@ USO DIARIO:
                                                             Crea o rota un secreto (k=? lo pide sin eco)
   malik totp <ruta> [--raw]                                 Genera el código 2FA TOTP de 6 dígitos
   malik run -s <ruta> -- <comando> [args...]                Inyecta secretos en RAM y censura logs
+  malik ssh <equipo> [--stdin-file f] -- <comando>          Ejecuta en un equipo de la bóveda sin ver sus credenciales
 
 AGENTES Y ADMINISTRACIÓN:
   malik mcp [--caller claude|antigravity]                   Arranca el servidor MCP nativo por stdio
-  malik init-agents                                         Instala la regla anti-preguntas en tus agentes
+  malik init-agents [--claude-permissions]                  MCP en Claude Desktop/Code, regla para agentes y permisos acotados
   malik token create --name <app> [--allow "ruta/*"]        Crea un App Token para bots 24/7 o ChatGPT
   malik audit [limite]                                      Muestra el historial de accesos de agentes
   malik lock / malik unlock                                 Bloqueo de pánico / Desbloqueo de la bóveda`)

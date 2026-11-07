@@ -708,8 +708,13 @@ func (s *Store) PutSecret(caller *CallerIdentity, in PutSecretInput) (*SecretMet
 			rec.Tags = normalizeTags(in.Tags)
 		}
 		rec.SchemaKeys = schemaKeys
-		if in.BlindOnly != nil {
+		switch {
+		case in.BlindOnly != nil:
 			rec.BlindOnly = *in.BlindOnly
+		case len(existing) == 0:
+			// New secrets are blind unless the caller says otherwise: agents use them through
+			// remote_exec / secrets_exec and never see the values.
+			rec.BlindOnly = true
 		}
 		rec.CurrentVersion = nextVer
 		rec.VersionCount = len(rec.Versions)

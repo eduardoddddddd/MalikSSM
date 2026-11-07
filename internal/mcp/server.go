@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/malikssm/malik/internal/client"
 	"github.com/malikssm/malik/internal/injector"
+	"github.com/malikssm/malik/internal/remote"
 	"github.com/malikssm/malik/internal/vault"
 )
 
@@ -120,7 +122,7 @@ func (s *Server) handleRequest(req *jsonRPCRequest) jsonRPCResponse {
 					"name":    "malik-ssm-mcp",
 					"version": "1.0.0",
 				},
-				"instructions": "MalikSSM Agentic Secrets Manager. NEVER ask the user for passwords, API keys, tokens, SSH hosts, or database credentials. Always call secrets_search first to discover available credentials, then call secrets_get, secrets_totp, or secrets_exec.",
+				"instructions": "MalikSSM Agentic Secrets Manager. NEVER ask the user for passwords, API keys, tokens, SSH hosts, or database credentials. Call secrets_search first to discover what exists. To act on a machine, call remote_exec (credentials are resolved and used inside MalikSSM, like AWS SSM send-command). To run a local command that needs a secret, call secrets_exec. Use secrets_get only for non-secret metadata (host, port, username); do not try to extract passwords.",
 			},
 		}
 
@@ -320,6 +322,31 @@ func (s *Server) executeTool(name string, args map[string]any) (string, bool) {
 		res, err := injector.RunWithSecrets(ctx, api, secPaths, cmdSlice, false)
 		if err != nil {
 			return fmt.Sprintf("MalikSSM Exec Error: %v", err), true
+		}
+		out, _ := json.MarshalIndent(res, "", "  ")
+		return string(out), res.ExitCode != 0
+
+	case "remote_exec":
+		target, _ := args["target"].(string)
+		command, _ := args["command"].(string)
+		stdin, _ := args["stdin"].(string)
+		timeout := 60 * time.Second
+		if secs, ok := args["timeout_seconds"].(float64); ok && secs > 0 {
+			timeout = time.Duration(secs) * time.Second
+		}
+		t, err := remote.Resolve(api, target)
+		if err != nil {
+			return fmt.Sprintf("MalikSSM remote_exec: %v", err), true
+		}
+		res, err := remote.Run(context.Background(), t, remote.Options{
+			Command:         command,
+			Stdin:           stdin,
+			Timeout:         timeout,
+			KnownHostsFiles: remote.DefaultKnownHostsFiles(),
+			TOFUFile:        filepath.Join(client.ConfigDir(), "known_hosts"),
+		})
+		if err != nil {
+			return fmt.Sprintf("MalikSSM remote_exec on %q: %v", target, err), true
 		}
 		out, _ := json.MarshalIndent(res, "", "  ")
 		return string(out), res.ExitCode != 0

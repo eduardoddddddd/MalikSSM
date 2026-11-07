@@ -53,15 +53,35 @@ Write-Host "=== Desplegando MalikSSM Server (malikd.exe) ===" -ForegroundColor C
 $TaskName = "MalikSSM-Win-Server-Daemon"
 $DataDir = Join-Path $InstallDir "data"
 
-# 0. Parar una instalación previa para poder sustituir los binarios
-if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+# 0. Parar una instalación previa para poder sustituir los binarios. Si algo falla a partir de aquí,
+#    se vuelve a arrancar la tarea existente para no dejar el servidor parado.
+$HadTask = [bool](Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)
+if ($HadTask) {
     Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 }
-Get-Process -Name malikd -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $InstallDir "malikd.exe") } | Stop-Process -Force
+$Running = Get-Process -Name malikd -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $InstallDir "malikd.exe") }
+$Running | Stop-Process -Force
+# Stop-Process vuelve antes de que Windows libere el .exe: esperar a que termine de verdad.
+$Running | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
+
+function Copy-WithRetry([string]$From, [string]$To) {
+    for ($i = 1; $i -le 10; $i++) {
+        try { Copy-Item $From $To -Force -ErrorAction Stop; return }
+        catch { if ($i -eq 10) { throw }; Start-Sleep -Milliseconds 500 }
+    }
+}
+
+trap {
+    if ($HadTask) {
+        Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        Write-Host "✖ La instalación falló; se ha vuelto a arrancar la versión anterior ($TaskName)." -ForegroundColor Red
+    }
+    throw $_
+}
 
 New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
-Copy-Item (Join-Path $BinDir "malikd.exe") (Join-Path $InstallDir "malikd.exe") -Force
-Copy-Item (Join-Path $BinDir "malik.exe")  (Join-Path $InstallDir "malik.exe")  -Force
+Copy-WithRetry (Join-Path $BinDir "malikd.exe") (Join-Path $InstallDir "malikd.exe")
+Copy-WithRetry (Join-Path $BinDir "malik.exe")  (Join-Path $InstallDir "malik.exe")
 $InitVault = Join-Path $PSScriptRoot "init-vault.ps1"
 if (Test-Path $InitVault) { Copy-Item $InitVault (Join-Path $InstallDir "init-vault.ps1") -Force }
 
