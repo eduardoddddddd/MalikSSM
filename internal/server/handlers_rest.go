@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,7 +17,42 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.store.Status())
 }
 
+const localInitOnlyMsg = "vault is not initialized: initialize it from the server itself (http://127.0.0.1:<port>/ui, 'malik login --server http://127.0.0.1:<port>' on the server, or malikd --init-pass)"
+
+// beginPassphraseAttempt applies per-IP lockout and the concurrent Argon2id cap. When ok is false
+// the response has already been written.
+func (s *Server) beginPassphraseAttempt(w http.ResponseWriter, r *http.Request) (ip string, release func(), ok bool) {
+	ip = extractClientIP(r)
+	if blocked, wait := s.limiter.blocked(ip); blocked {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		writeJSONError(w, http.StatusTooManyRequests, fmt.Sprintf("too many failed passphrase attempts from %s; retry in %s", ip, wait.Round(time.Second)))
+		return ip, nil, false
+	}
+	release, err := s.limiter.acquireKDF(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "server busy, retry")
+		return ip, nil, false
+	}
+	return ip, release, true
+}
+
+// endPassphraseAttempt records the outcome of a passphrase check for the lockout counter.
+func (s *Server) endPassphraseAttempt(ip string, err error) {
+	switch {
+	case err == nil:
+		s.limiter.success(ip)
+	case errors.Is(err, security.ErrInvalidPassphrase):
+		s.limiter.failure(ip)
+	}
+}
+
 func (s *Server) handleInit(w http.ResponseWriter, r *http.Request) {
+	// Whoever initializes the vault chooses the master passphrase, so this is only allowed from the
+	// server itself: otherwise anyone (or any web page, via the browser) reaching the port first would own it.
+	if !isLocalRequest(r) {
+		writeJSONError(w, http.StatusForbidden, localInitOnlyMsg)
+		return
+	}
 	var req struct {
 		Passphrase string `json:"passphrase"`
 		AutoUnseal *bool  `json:"auto_unseal"`
@@ -30,6 +66,12 @@ func (s *Server) handleInit(w http.ResponseWriter, r *http.Request) {
 	if req.AutoUnseal != nil {
 		autoUnseal = *req.AutoUnseal
 	}
+
+	_, release, ok := s.beginPassphraseAttempt(w, r)
+	if !ok {
+		return
+	}
+	defer release()
 
 	if err := s.store.InitVault(req.Passphrase, autoUnseal); err != nil {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
@@ -63,7 +105,15 @@ func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if err := s.store.Unlock(req.Passphrase, req.AutoUnseal, extractClientIP(r)); err != nil {
+	ip, release, ok := s.beginPassphraseAttempt(w, r)
+	if !ok {
+		return
+	}
+	defer release()
+
+	err := s.store.Unlock(req.Passphrase, req.AutoUnseal, ip)
+	s.endPassphraseAttempt(ip, err)
+	if err != nil {
 		writeJSONError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -101,8 +151,19 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If vault is not yet initialized, auto-initialize on first login for frictionless onboarding
+	ip, release, ok := s.beginPassphraseAttempt(w, r)
+	if !ok {
+		return
+	}
+	defer release()
+
+	// If vault is not yet initialized, auto-initialize on first login — but only from the server itself
+	// (see handleInit).
 	if !s.store.IsInitialized() {
+		if !isLocalRequest(r) {
+			writeJSONError(w, http.StatusForbidden, localInitOnlyMsg)
+			return
+		}
 		if err := s.store.InitVault(req.Passphrase, true); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "vault not initialized and auto-init failed: "+err.Error())
 			return
@@ -125,7 +186,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		agent = "malik-cli"
 	}
 
-	token, sess, err := s.store.CreateSession(req.Passphrase, host, agent, extractClientIP(r), ttl)
+	token, sess, err := s.store.CreateSession(req.Passphrase, host, agent, ip, ttl)
+	s.endPassphraseAttempt(ip, err)
 	if err != nil {
 		writeJSONError(w, http.StatusUnauthorized, err.Error())
 		return

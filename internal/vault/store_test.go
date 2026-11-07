@@ -15,6 +15,7 @@ func TestVaultStoreLifecycleVersioningScopesAndAutoUnseal(t *testing.T) {
 		t.Fatalf("OpenStore failed: %v", err)
 	}
 	defer store.Close()
+	store.AllowAutoUnseal = true // default only on Windows; this test exercises the reboot path everywhere
 
 	if store.IsInitialized() {
 		t.Fatalf("expected new store to be uninitialized")
@@ -139,6 +140,10 @@ func TestVaultStoreLifecycleVersioningScopesAndAutoUnseal(t *testing.T) {
 		t.Fatalf("reopen failed: %v", err)
 	}
 	defer reopened.Close()
+	if !reopened.IsUnlocked() {
+		reopened.AllowAutoUnseal = true
+		_ = reopened.TryAutoUnseal()
+	}
 
 	if !reopened.IsUnlocked() {
 		t.Fatalf("expected reopened store to auto-unseal via Windows DPAPI")

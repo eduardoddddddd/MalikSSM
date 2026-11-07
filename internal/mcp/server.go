@@ -40,6 +40,14 @@ type Server struct {
 	ServerOverride string
 	TokenOverride  string
 	CallerAgent    string
+	// NoReveal makes secrets_get mask every sensitive value, as if all secrets were blind_only.
+	NoReveal bool
+}
+
+// isPublicField mirrors the injector's notion of non-sensitive KV fields (host, port, user...),
+// which agents may read to know where to connect.
+func isPublicField(k string) bool {
+	return !injector.IsSensitiveFieldName(k)
 }
 
 // NewServer creates a new stdio MCP server instance.
@@ -205,6 +213,19 @@ func (s *Server) executeTool(name string, args map[string]any) (string, bool) {
 		if err != nil {
 			return fmt.Sprintf("MalikSSM Error retrieving %q: %v", path, err), true
 		}
+		// Values returned here land in the model's context (and the provider's logs). Blind secrets,
+		// or every secret when the server runs with --no-reveal, are only usable through secrets_exec.
+		if sec.BlindOnly || s.NoReveal {
+			for k := range sec.Data {
+				if !isPublicField(k) {
+					sec.Data[k] = "***BLIND***"
+				}
+			}
+			sec.Value = ""
+			if field != "" && !isPublicField(field) {
+				return fmt.Sprintf("Secret %q is blind-only: its values are never returned to the agent. Use secrets_exec with secrets=[%q] (env vars) or the {{SECRET:%s#%s}} placeholder.", sec.Path, sec.Path, sec.Path, field), true
+			}
+		}
 		if field != "" {
 			val, ok := sec.Data[field]
 			if !ok {
@@ -242,14 +263,18 @@ func (s *Server) executeTool(name string, args map[string]any) (string, bool) {
 			}
 		}
 
-		meta, err := api.PutSecret(vault.PutSecretInput{
+		in := vault.PutSecretInput{
 			Path:        path,
 			Type:        secType,
 			Description: desc,
 			Tags:        tags,
 			Value:       val,
 			Data:        dataMap,
-		})
+		}
+		if blind, ok := args["blind_only"].(bool); ok {
+			in.BlindOnly = &blind
+		}
+		meta, err := api.PutSecret(in)
 		if err != nil {
 			return fmt.Sprintf("MalikSSM Error saving %q: %v", path, err), true
 		}

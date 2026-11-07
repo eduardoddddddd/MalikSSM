@@ -48,7 +48,7 @@ func RunWithSecrets(ctx context.Context, api *client.Client, secretPaths []strin
 				if v == "" {
 					continue
 				}
-				if isSensitiveFieldName(k) {
+				if IsSensitiveFieldName(k) {
 					sensitiveValues = append(sensitiveValues, v)
 				}
 				cleanKey := sanitizeEnvKey(k)
@@ -56,8 +56,12 @@ func RunWithSecrets(ctx context.Context, api *client.Client, secretPaths []strin
 					envMap[baseName] = v
 					injectedKeys = append(injectedKeys, baseName)
 				} else {
-					envMap[cleanKey] = v
-					injectedKeys = append(injectedKeys, cleanKey)
+					// The bare name (e.g. PASSWORD) goes to the first secret that defines it; later
+					// secrets only get the unambiguous prefixed form (e.g. POSTGRES_PASSWORD).
+					if _, taken := envMap[cleanKey]; !taken {
+						envMap[cleanKey] = v
+						injectedKeys = append(injectedKeys, cleanKey)
+					}
 					prefixed := baseName + "_" + cleanKey
 					if _, exists := envMap[prefixed]; !exists {
 						envMap[prefixed] = v
@@ -181,7 +185,9 @@ func resolveInlinePlaceholders(api *client.Client, input string) (string, []stri
 	return input, sensitive, nil
 }
 
-func isSensitiveFieldName(k string) bool {
+// IsSensitiveFieldName reports whether a KV field holds a secret value (anything except connection
+// metadata such as host, port or username).
+func IsSensitiveFieldName(k string) bool {
 	switch strings.ToLower(strings.TrimSpace(k)) {
 	case "host", "hostname", "ip", "port", "user", "username", "region", "database", "db", "env", "environment":
 		return false

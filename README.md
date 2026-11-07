@@ -7,17 +7,16 @@
   <img src="https://img.shields.io/badge/Clients-Windows_%7C_macOS_%7C_Linux-8B5CF6?style=for-the-badge&logo=apple&logoColor=white" alt="Windows | macOS | Linux" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Windows-x64_(DPAPI_%2F_TPM_2.0)-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows x64" />
+  <img src="https://img.shields.io/badge/Windows-x64_(DPAPI)-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows x64" />
   <img src="https://img.shields.io/badge/macOS-Apple_Silicon_(M1--M4)_%26_Intel-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS ARM64 & Intel" />
   <img src="https://img.shields.io/badge/Linux-x64_%26_ARM64-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux x64 & ARM64" />
   <img src="https://img.shields.io/badge/MCP_Server-Claude_%26_Antigravity_Ready-F59E0B?style=flat-square&logo=anthropic&logoColor=white" alt="MCP Ready" />
   <img src="https://img.shields.io/badge/AWS_Emulator-Boto3_SecretsManager_Compatible-FF9900?style=flat-square&logo=amazonwebservices&logoColor=white" alt="AWS Boto3 Compatible" />
   <img src="https://img.shields.io/badge/ChatGPT_Actions-OpenAPI_3.1-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAPI 3.1" />
   <img src="https://img.shields.io/badge/2FA-RFC_6238_TOTP_Generator-06B6D4?style=flat-square&logo=googleauthenticator&logoColor=white" alt="TOTP 2FA" />
-  <img src="https://img.shields.io/badge/Tests-Passing_100%25-22C55E?style=flat-square&logo=checkmarx&logoColor=white" alt="Tests Passing" />
 </p>
 
-> **Infraestructura criptográfica multiplataforma de gestión de secretos y sesiones de grado industrial escrita en Go 1.26 nativo (`CGO_ENABLED=0`). Incluye servidor central (`Windows` y `Linux`) y clientes nativos todo-en-uno para `Windows`, `macOS (Apple Silicon & Intel)` y `Linux (x64 & ARM64)`, eliminando por completo la fricción de credenciales entre humanos, agentes de IA (Claude, Antigravity, ChatGPT) y aplicaciones.**
+> **Gestor de secretos y sesiones multiplataforma escrito en Go 1.26 nativo (`CGO_ENABLED=0`). Incluye servidor central (`Windows` y `Linux`) y clientes nativos todo-en-uno para `Windows`, `macOS (Apple Silicon & Intel)` y `Linux (x64 & ARM64)`, eliminando por completo la fricción de credenciales entre humanos, agentes de IA (Claude, Antigravity, ChatGPT) y aplicaciones.**
 
 ---
 
@@ -63,13 +62,13 @@ Todos los binarios están precompilados estáticamente en la carpeta [`bin/`](bi
 
 | Binario en `bin/` | Sistema Operativo | Arquitectura | Bloqueo de RAM Física | Sellado de Sesión Local (`session.bin`) | Ruta del Cofre Local de Sesión |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`malik.exe`** | **Windows** (Cliente + MCP) | `x86_64` (`amd64`) | Win32 `VirtualLock` (`kernel32.dll`) | Hardware **Windows DPAPI / TPM 2.0** (`CryptProtectData`) | `%APPDATA%\MalikSSM\session.bin` |
-| **`malik-darwin-arm64`** | **macOS Apple Silicon** (Cliente + MCP) | `ARM64` (`M1/M2/M3/M4`) | Syscall `unix.Mlock` | **Argon2id + AES-256-GCM** vinculado a Host + UID de usuario | `~/Library/Application Support/MalikSSM/session.bin` |
-| **`malik-darwin-amd64`** | **macOS Intel** (Cliente + MCP) | `x86_64` (`amd64`) | Syscall `unix.Mlock` | **Argon2id + AES-256-GCM** vinculado a Host + UID de usuario | `~/Library/Application Support/MalikSSM/session.bin` |
-| **`malik-linux-amd64`** | **Linux** (Cliente + MCP) | `x86_64` (`amd64`) | Syscall `unix.Mlock` | **Argon2id + AES-256-GCM** vinculado a `/etc/machine-id` + UID | `~/.config/MalikSSM/session.bin` |
-| **`malik-linux-arm64`** | **Linux ARM64** (Cliente + MCP) | `ARM64` (`aarch64`) | Syscall `unix.Mlock` | **Argon2id + AES-256-GCM** vinculado a `/etc/machine-id` + UID | `~/.config/MalikSSM/session.bin` |
-| **`malikd.exe`** | **Windows Server** (Servidor 24/7) | `x86_64` (`amd64`) | Win32 `VirtualLock` | Auto-Unseal vía **Windows DPAPI / TPM 2.0** | `data\malik.db` |
-| **`malikd-linux-amd64`** | **Linux Server** (Servidor 24/7) | `x86_64` (`amd64`) | Syscall `unix.Mlock` | Auto-Unseal vía `/etc/machine-id` + Host Key | `data/malik.db` |
+| **`malik.exe`** | **Windows** (Cliente + MCP) | `x86_64` (`amd64`) | Win32 `VirtualLock` (`kernel32.dll`) | **Windows DPAPI** de usuario (`CryptProtectData`) | `%APPDATA%\MalikSSM\session.bin` |
+| **`malik-darwin-arm64`** | **macOS Apple Silicon** (Cliente + MCP) | `ARM64` (`M1/M2/M3/M4`) | Syscall `unix.Mlock` | Ofuscación **Argon2id + AES-256-GCM** ligada a host + UID (no es hardware) | `~/Library/Application Support/MalikSSM/session.bin` |
+| **`malik-darwin-amd64`** | **macOS Intel** (Cliente + MCP) | `x86_64` (`amd64`) | Syscall `unix.Mlock` | Ofuscación **Argon2id + AES-256-GCM** ligada a host + UID (no es hardware) | `~/Library/Application Support/MalikSSM/session.bin` |
+| **`malik-linux-amd64`** | **Linux** (Cliente + MCP) | `x86_64` (`amd64`) | Syscall `unix.Mlock` | Ofuscación **Argon2id + AES-256-GCM** ligada a `/etc/machine-id` + UID (no es hardware) | `~/.config/MalikSSM/session.bin` |
+| **`malik-linux-arm64`** | **Linux ARM64** (Cliente + MCP) | `ARM64` (`aarch64`) | Syscall `unix.Mlock` | Ofuscación **Argon2id + AES-256-GCM** ligada a `/etc/machine-id` + UID (no es hardware) | `~/.config/MalikSSM/session.bin` |
+| **`malikd.exe`** | **Windows Server** (Servidor 24/7) | `x86_64` (`amd64`) | Win32 `VirtualLock` | Auto-Unseal vía **Windows DPAPI** (activado por defecto) | `data\malik.db` |
+| **`malikd-linux-amd64`** | **Linux Server** (Servidor 24/7) | `x86_64` (`amd64`) | Syscall `unix.Mlock` | Sin auto-unseal por defecto (`--auto-unseal` opcional, solo ofuscación) | `data/malik.db` |
 
 ---
 
@@ -123,7 +122,7 @@ flowchart TB
         UI["Web UI Dark Mode Embebida (//go:embed)\nGestión Visual + Botón del Pánico + Live Audit"]
         MEMLOCK["Master Key (KEK) en RAM Física\nProtegida con VirtualLock / unix.Mlock"]
         ENVELOPE["Motor Criptográfico Envelope\nArgon2id (64MB) + AES-256-GCM + AAD"]
-        UNSEAL[("Auto-Unseal Hardware\nDPAPI / TPM 2.0 / Host Seal")]
+        UNSEAL[("Auto-Unseal\nDPAPI (Windows) / opcional en Linux")]
         BOLT[("Base de Datos ACID (bbolt)\nmalik.db")]
 
         ROUTER --> UI
@@ -147,7 +146,7 @@ Al igual que AWS KMS + AWS Secrets Manager, MalikSSM **nunca cifra todos los sec
 ```mermaid
 flowchart LR
     PASS["Master Passphrase\n(Contraseña Maestra)"] -->|"Argon2id\n(t=3, m=64MB, p=4 + Salt 16B)"| KEK["Master Key (KEK - 256 bits)\nBloqueada en RAM (VirtualLock / mlock)"]
-    KEK <-->|"DPAPI / Host Hardware Seal"| UNSEAL["malik.db.unseal\n(Auto-Unseal tras reinicio del servidor)"]
+    KEK <-->|"DPAPI (Windows)"| UNSEAL["malik.db.unseal\n(Auto-Unseal tras reinicio del servidor)"]
     
     RNG["crypto/rand\n(Generador CSPRNG)"] -->|"Nueva en cada versión"| DEK["Data Encryption Key (DEK)\n256 bits efímera en RAM"]
     
@@ -178,7 +177,7 @@ flowchart LR
 ### Escenario A: Tus Ordenadores Windows, Mac y Linux (Sesiones `mlk_sess_...`)
 * **Objetivo**: Que ni Claude, ni Antigravity, ni tu terminal te pidan tokens ni tengas que editar archivos JSON de configuración cuando caduquen.
 * **Funcionamiento idéntico en Windows, macOS y Linux**:
-  1. Ejecutas `malik login --server http://ip-servidor:8443` (puedes añadir `--days 30` para hacerlo solo una vez al mes).
+  1. Ejecutas `malik login --server http://ip-tailscale-servidor:8443` (o `https://` si usas TLS) (puedes añadir `--days 30` para hacerlo solo una vez al mes).
   2. El servidor devuelve un token de sesión `mlk_sess_...`.
   3. El cliente `malik` cifra ese token con la protección nativa del sistema operativo (Windows DPAPI en Windows, o clave derivada con `Argon2id + AES-256-GCM` vinculada al `machine-id`/UID en macOS y Linux) y lo guarda en `session.bin`.
   4. Cuando Claude o Antigravity invocan `malik mcp`, o cuando ejecutas `malik get` / `malik run`, el binario lee y desencripta `session.bin` en memoria automáticamente.
@@ -220,9 +219,9 @@ Integrado dentro del binario `malik` en Windows, macOS y Linux siguiendo el est�
 
 | Herramienta MCP | Argumentos Principales | Qué hace |
 | :--- | :--- | :--- |
-| **`secrets_search`** | `query` (string), `tags` (string[]) | Busca secretos semánticamente y devuelve rutas, descripciones, tags y `schema_keys` sin revelar contraseñas. |
-| **`secrets_get`** | `path` (string), `field` (opc.), `stage` (opc.) | Desencripta y devuelve el secreto completo o un campo específico (`AWSCURRENT` o `AWSPREVIOUS`). |
-| **`secrets_set`** | `path`, `type`, `description`, `tags`, `data`, `value` | Crea un secreto nuevo o rota uno existente incrementando su versión automáticamente. |
+| **`secrets_search`** | `query` (string), `tags` (string[]) | Busca secretos por palabras clave (ruta, tags, descripción, `schema_keys`) y devuelve metadatos sin revelar contraseñas. |
+| **`secrets_get`** | `path` (string), `field` (opc.), `stage` (opc.) | Desencripta y devuelve el secreto o un campo (`AWSCURRENT` o `AWSPREVIOUS`). **El valor entra en el chat.** En secretos `blind_only` (o con `malik mcp --no-reveal`) los campos sensibles se devuelven enmascarados y solo se ven `host`/`port`/`username`. |
+| **`secrets_set`** | `path`, `type`, `description`, `tags`, `data`, `value`, `blind_only` | Crea un secreto nuevo o rota uno existente incrementando su versión. Si se omite `blind_only` al rotar, se conserva el valor actual. |
 | **`secrets_totp`** | `path` (string) | Calcula en tiempo real el código 2FA TOTP de 6 dígitos (RFC 6238) y los segundos restantes de validez. |
 | **`secrets_exec`** | `secrets` (string[]), `command` (string / string[]) | **Inyección a ciegas**: ejecuta un comando local inyectando los secretos en RAM y censurando (`***REDACTED***`) cualquier contraseña en la salida. |
 | **`vault_status`** | *(ninguno)* | Devuelve el estado de salud, bloqueo, número de secretos y sesiones del servidor. |
@@ -319,6 +318,8 @@ MalikSSM/
 │   │   ├── ui.go                   # Directiva //go:embed del panel web
 │   │   ├── ui/index.html           # Aplicación Web Single-Page Dark Mode sin dependencias externas
 │   │   └── server_test.go          # Tests de integración E2E de API REST, login y protocolo AWS
+│   ├── agentcfg/
+│   │   └── claude.go               # Registro seguro del MCP en claude_desktop_config.json (merge + copia previa)
 │   ├── client/
 │   │   ├── config.go               # Gestión multiplataforma de session.bin (Windows, macOS y Linux)
 │   │   └── api_client.go           # Cliente HTTP tipado con atribución de agente (X-Malik-Agent)
@@ -343,16 +344,39 @@ MalikSSM/
 ## 10. Guía de Instalación Paso a Paso (Windows, macOS y Linux)
 
 ### 10.1 Despliegue del Servidor Central (24/7)
-* **En Servidor Windows**:
+`malikd` escucha por defecto **solo en `127.0.0.1`** y se niega a servir HTTP plano en cualquier otra dirección.
+Elige una de estas tres opciones para dar servicio a tus otros equipos:
+
+| Opción | Cuándo | Ejemplo |
+| :--- | :--- | :--- |
+| IP de **Tailscale** + `--insecure-http` | Recomendado: WireGuard ya cifra el tráfico | `--addr 100.x.y.z:8443 --insecure-http` |
+| IP de LAN + **TLS** | Sin Tailscale | `--addr 192.168.1.13:8443 --tls-cert cert.pem --tls-key key.pem` |
+| Solo `127.0.0.1` | Servidor y agentes en el mismo equipo | (por defecto) |
+
+* **En Servidor Windows** (p. ej. un mini-PC o portátil siempre encendido):
   ```powershell
-  .\scripts\install-server.ps1 -Port 8443
+  .\scripts\install-server.ps1 -Port 8443 -BindAddress 100.x.y.z -InsecureHttp
   ```
 * **En Servidor Linux**:
   ```bash
   chmod +x ./bin/malikd-linux-amd64
-  ./bin/malikd-linux-amd64 --addr 0.0.0.0:8443 --db ./data/malik.db
+  ./bin/malikd-linux-amd64 --addr 100.x.y.z:8443 --insecure-http --db ./data/malik.db
   ```
-Abre `http://IP-DEL-SERVIDOR:8443/ui` desde cualquier navegador para inicializar tu Contraseña Maestra.
+
+**Inicialización (primera vez):** solo se permite desde el propio servidor. Puedes abrir `http://127.0.0.1:8443/ui` en él (o su IP de escucha desde ese mismo equipo), ejecutar allí `malik login`, o arrancar con `MALIK_INIT_PASS`.
+Las peticiones remotas a `/v1/system/init`, o un primer `login` remoto, reciben `403`. Así nadie que llegue antes al puerto puede fijar la contraseña maestra.
+
+**Auto-Unseal:** en Windows está activado por defecto (DPAPI del usuario). En Linux/macOS está **desactivado**: tras reiniciar hay que ejecutar `malik unlock`, o arrancar con `MALIK_INIT_PASS` desde un gestor de credenciales. `--auto-unseal` lo activa, pero allí solo es ofuscación: la clave se deriva de hostname/UID/machine-id, y cualquiera que lea el directorio de datos puede descifrar la bóveda.
+
+### 10.1.1 Medidas de seguridad del servidor
+* **Límite de intentos:** 5 contraseñas fallidas desde una IP la bloquean 15 minutos (`429` + `Retry-After`). Como máximo se ejecutan 2 derivaciones Argon2id (64 MB cada una) a la vez.
+* **Sesiones ligadas a la IP** que hizo `login`: un `session.bin` copiado a otra máquina no sirve. Si tu IP cambia, vuelve a hacer `malik login`. Se desactiva con `--bind-sessions-to-ip=false`.
+* **Sin CORS por defecto.** La UI es same-origin y los CLI/SDK/boto3/ChatGPT Actions no lo necesitan. `--cors-origin https://…` lo habilita para un único origen.
+* **`X-Forwarded-For`** solo se acepta si viene de un proxy en el mismo host. `?token=` solo se acepta en `/v1/audit/stream` (SSE).
+
+### 10.1.2 Límites conocidos (léelos)
+* Cualquier proceso que corra con tu usuario en un equipo con sesión iniciada puede usar esa sesión (`malik get`, `malik session-token`). Esto incluye un agente con acceso a shell. `blind_only` y `--no-reveal` evitan que los valores **lleguen al chat por MCP**, pero no protegen frente a un agente malicioso con shell.
+* La censura de `secrets_exec` / `malik run` es de mejor esfuerzo: no detecta un secreto transformado (base64, invertido…). En `malik run` interactivo, un secreto partido entre dos escrituras puede verse en la consola.
 
 ---
 
@@ -368,7 +392,7 @@ Abre `http://IP-DEL-SERVIDOR:8443/ui` desde cualquier navegador para inicializar
    * Añade el protocolo global anti-preguntas en `~/.claude/CLAUDE.md`.
 2. Inicia sesión contra tu servidor:
    ```bash
-   malik login --server http://IP-DEL-SERVIDOR:8443 --days 30
+   malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30
    ```
 
 ---
@@ -384,7 +408,7 @@ Abre `http://IP-DEL-SERVIDOR:8443/ui` desde cualquier navegador para inicializar
    * Registra el servidor MCP en `~/.config/Claude/claude_desktop_config.json` y la regla global en `~/.claude/CLAUDE.md`.
 2. Inicia sesión contra tu servidor:
    ```bash
-   malik login --server http://IP-DEL-SERVIDOR:8443 --days 30
+   malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30
    ```
 
 ---
@@ -396,7 +420,7 @@ Abre `http://IP-DEL-SERVIDOR:8443/ui` desde cualquier navegador para inicializar
    ```
 2. Inicia sesión contra tu servidor:
    ```powershell
-   malik login --server http://IP-DEL-SERVIDOR:8443 --days 30
+   malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30
    ```
 
 ---

@@ -22,30 +22,12 @@ if ($UserPath -notlike "*$BinDir*") {
     Write-Host "✔ Añadido $BinDir al PATH de tu usuario de Windows" -ForegroundColor Green
 }
 
-# 2. Ejecutar malik init-agents (escribe regla en ~/.claude/CLAUDE.md)
+# 2. malik init-agents: regla en ~/.claude/CLAUDE.md y registro del MCP en Claude Desktop.
+#    El merge del JSON lo hace el binario (conserva los demás MCP, crea copia previa y aborta si
+#    el fichero no se puede leer), así no depende de la versión de PowerShell.
 & $MalikExe init-agents
-
-# 3. Registrar MCP en Claude Desktop (%APPDATA%\Claude\claude_desktop_config.json)
-$ClaudeConfigPath = Join-Path $env:APPDATA "Claude\claude_desktop_config.json"
-$ClaudeDir = Split-Path -Parent $ClaudeConfigPath
-if (-not (Test-Path $ClaudeDir)) {
-    New-Item -ItemType Directory -Path $ClaudeDir -Force | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "malik init-agents falló (código $LASTEXITCODE); claude_desktop_config.json no se ha modificado."
 }
-$ClaudeJson = @{ mcpServers = @{} }
-if (Test-Path $ClaudeConfigPath) {
-    try {
-        $Parsed = Get-Content $ClaudeConfigPath -Raw | ConvertFrom-Json -AsHashtable
-        if ($Parsed) { $ClaudeJson = $Parsed }
-    } catch {}
-}
-if (-not $ClaudeJson.ContainsKey("mcpServers") -or $null -eq $ClaudeJson["mcpServers"]) {
-    $ClaudeJson["mcpServers"] = @{}
-}
-$ClaudeJson["mcpServers"]["malik"] = @{
-    command = $MalikExe
-    args    = @("mcp", "--caller", "claude-desktop")
-}
-$ClaudeJson | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfigPath -Encoding UTF8
-Write-Host "✔ Servidor MCP 'malik' registrado en Claude Desktop: $ClaudeConfigPath" -ForegroundColor Green
 
 Write-Host "`nListo. Ahora solo tienes que hacer 'malik login' por la mañana y todos tus agentes hablarán con la Servidor Central." -ForegroundColor Cyan

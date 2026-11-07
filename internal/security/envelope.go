@@ -29,11 +29,11 @@ var (
 // EnvelopeBlob represents a single version's encrypted Data Encryption Key (DEK)
 // and encrypted payload, bound to a specific path, version, and secret type via GCM AAD.
 type EnvelopeBlob struct {
-	WrappedDEK      []byte `json:"wrapped_dek"`
-	DEKNonce        []byte `json:"dek_nonce"`
-	Ciphertext      []byte `json:"ciphertext"`
-	PayloadNonce    []byte `json:"payload_nonce"`
-	Algorithm       string `json:"algorithm"`
+	WrappedDEK   []byte `json:"wrapped_dek"`
+	DEKNonce     []byte `json:"dek_nonce"`
+	Ciphertext   []byte `json:"ciphertext"`
+	PayloadNonce []byte `json:"payload_nonce"`
+	Algorithm    string `json:"algorithm"`
 }
 
 // VaultKeyMeta is stored in the database header to verify master passphrases.

@@ -49,41 +49,10 @@ for RC in "$HOME/.zshrc" "$HOME/.bashrc"; do
   fi
 done
 
-# 3. Ejecutar init-agents para instalar la regla global en ~/.claude/CLAUDE.md
+# 3. malik init-agents: regla global en ~/.claude/CLAUDE.md y registro del MCP en Claude Desktop.
+#    El binario conserva los demás servidores MCP, crea copia previa y aborta si el JSON no se puede leer.
 "$TARGET_BIN" init-agents
-
-# 4. Registrar MCP en Claude Desktop (macOS y Linux)
-if [[ "$OS" == "darwin" ]]; then
-  CLAUDE_CFG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-else
-  CLAUDE_CFG="$HOME/.config/Claude/claude_desktop_config.json"
-fi
-
-mkdir -p "$(dirname "$CLAUDE_CFG")"
-
-if command -v python3 >/dev/null 2>&1; then
-  python3 - "$CLAUDE_CFG" "$TARGET_BIN" <<'PY'
-import json, os, sys
-cfg_path, bin_path = sys.argv[1], sys.argv[2]
-data = {}
-if os.path.exists(cfg_path):
-    try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        data = {}
-if not isinstance(data.get("mcpServers"), dict):
-    data["mcpServers"] = {}
-data["mcpServers"]["malik"] = {
-    "command": bin_path,
-    "args": ["mcp", "--caller", "claude-desktop"]
-}
-with open(cfg_path, "w", encoding="utf-8") as f:
-    json.dump(data, f, indent=2)
-PY
-  echo "✔ Servidor MCP 'malik' registrado en: $CLAUDE_CFG"
-fi
 
 echo ""
 echo "🚀 Listo. Para autenticar este equipo contra tu servidor MalikSSM ejecuta:"
-echo "   malik login --server http://IP-DEL-SERVIDOR:8443 --days 30"
+echo "   malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30   (https:// si el servidor usa TLS)"

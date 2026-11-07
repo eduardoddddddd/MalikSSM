@@ -22,7 +22,7 @@ func toolDefinitions() []map[string]any {
 		},
 		{
 			"name":        "secrets_get",
-			"description": "Retrieve a decrypted secret or a specific key field from MalikSSM by path (e.g., 'apis/openai/prod' or 'servidores/hetzner/ssh').",
+			"description": "Retrieve a decrypted secret or a specific key field from MalikSSM by path (e.g., 'apis/openai/prod' or 'servidores/hetzner/ssh'). Values returned here enter the conversation: prefer secrets_exec whenever the value is only needed by a command. Blind-only secrets return masked values (connection fields such as host/port/username stay visible).",
 			"inputSchema": map[string]any{
 				"type":     "object",
 				"required": []string{"path"},
@@ -75,6 +75,10 @@ func toolDefinitions() []map[string]any {
 					"value": map[string]any{
 						"type":        "string",
 						"description": "Plain string secret value (if not using key-value 'data').",
+					},
+					"blind_only": map[string]any{
+						"type":        "boolean",
+						"description": "If true, secrets_get never returns this secret's values to agents; it can only be used through secrets_exec. Omit to keep the current setting when rotating.",
 					},
 				},
 			},

@@ -33,13 +33,15 @@ func unlockMemory(b []byte) error {
 
 // HardwareProviderName returns a human-readable description of the OS hardware/memory backing.
 func HardwareProviderName() string {
+	// The "seal" below derives its key from hostname, UID and machine-id, all readable on the host:
+	// it binds data to the machine but is obfuscation, not hardware-backed protection.
 	switch runtime.GOOS {
 	case "darwin":
-		return "macOS Host-Key Sealing + unix.Mlock"
+		return "macOS host-bound obfuscation (not hardware-backed) + unix.Mlock"
 	case "linux":
-		return "Linux Machine-ID Sealing + unix.Mlock"
+		return "Linux machine-id-bound obfuscation (not hardware-backed) + unix.Mlock"
 	default:
-		return runtime.GOOS + " Host Sealing + unix.Mlock"
+		return runtime.GOOS + " host-bound obfuscation (not hardware-backed) + unix.Mlock"
 	}
 }
 

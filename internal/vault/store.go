@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -46,6 +47,14 @@ type Store struct {
 
 	subMu       sync.Mutex
 	subscribers map[chan AuditEntry]struct{}
+
+	// AllowAutoUnseal permits writing and using the malik.db.unseal blob. It defaults to true only on
+	// Windows (DPAPI). On macOS/Linux the blob is merely bound to hostname/UID/machine-id, which anyone
+	// with disk access can read, so it is opt-in there.
+	AllowAutoUnseal bool
+	// BindSessionsToIP rejects a session token used from an IP other than the one that created it,
+	// limiting the value of a copied session.bin token.
+	BindSessionsToIP bool
 }
 
 // OpenStore opens or creates the bbolt database file and attempts Hardware Auto-Unseal if configured.
@@ -69,14 +78,18 @@ func OpenStore(dbPath string) (*Store, error) {
 	}
 
 	s := &Store{
-		db:          db,
-		dbPath:      dbPath,
-		unsealPath:  dbPath + ".unseal",
-		subscribers: make(map[chan AuditEntry]struct{}),
+		db:               db,
+		dbPath:           dbPath,
+		unsealPath:       dbPath + ".unseal",
+		subscribers:      make(map[chan AuditEntry]struct{}),
+		AllowAutoUnseal:  runtime.GOOS == "windows",
+		BindSessionsToIP: true,
 	}
 
 	// If Hardware DPAPI Auto-Unseal file exists on the Servidor Central, unseal into VirtualLocked RAM automatically.
-	_ = s.TryAutoUnseal()
+	if s.AllowAutoUnseal {
+		_ = s.TryAutoUnseal()
+	}
 
 	return s, nil
 }
@@ -124,36 +137,21 @@ func (s *Store) InitVault(passphrase string, enableAutoUnseal bool) error {
 	if len(passphrase) < 6 {
 		return errors.New("master passphrase must be at least 6 characters")
 	}
-
-	salt, err := security.GenerateSalt()
-	if err != nil {
-		return err
-	}
-	rawKEK := security.DeriveKEK([]byte(passphrase), salt)
-
-	var sealedAutoUnseal []byte
-	if enableAutoUnseal {
-		sealedAutoUnseal, err = security.ProtectBytesHardware(rawKEK, s.dbPath)
-		if err != nil {
-			security.Zeroize(rawKEK)
-			return fmt.Errorf("failed to create hardware DPAPI auto-unseal key: %w", err)
-		}
-	}
-	security.Zeroize(rawKEK)
+	enableAutoUnseal = enableAutoUnseal && s.AllowAutoUnseal
 
 	meta, lk, err := security.CreateVaultKeyMeta([]byte(passphrase))
 	if err != nil {
 		return err
 	}
 
-	// Re-derive with meta.Salt if needed for auto-unseal consistency
+	var sealedAutoUnseal []byte
 	if enableAutoUnseal {
-		rawKEK2 := security.DeriveKEK([]byte(passphrase), meta.Salt)
-		sealedAutoUnseal, err = security.ProtectBytesHardware(rawKEK2, s.dbPath)
-		security.Zeroize(rawKEK2)
+		rawKEK := security.DeriveKEK([]byte(passphrase), meta.Salt)
+		sealedAutoUnseal, err = security.ProtectBytesHardware(rawKEK, s.dbPath)
+		security.Zeroize(rawKEK)
 		if err != nil {
 			lk.Destroy()
-			return err
+			return fmt.Errorf("failed to create auto-unseal key: %w", err)
 		}
 	}
 
@@ -239,7 +237,7 @@ func (s *Store) Unlock(passphrase string, updateAutoUnseal bool, clientIP string
 		return err
 	}
 
-	if updateAutoUnseal {
+	if updateAutoUnseal && s.AllowAutoUnseal {
 		rawKEK := security.DeriveKEK([]byte(passphrase), meta.Salt)
 		if sealed, err := security.ProtectBytesHardware(rawKEK, s.dbPath); err == nil {
 			_ = os.WriteFile(s.unsealPath, sealed, 0600)
@@ -331,6 +329,7 @@ func (s *Store) CreateSession(passphrase string, clientHost string, agentName st
 		ID:         hex.EncodeToString(idBytes),
 		TokenHash:  tokenHash,
 		ClientHost: clientHost,
+		ClientIP:   clientIP,
 		AgentName:  agentName,
 		CreatedAt:  now,
 		ExpiresAt:  now.Add(ttl),
@@ -467,6 +466,11 @@ func (s *Store) AuthenticateToken(rawToken string, agentHeader string, clientIP 
 		if now.After(sess.ExpiresAt) {
 			return nil, ErrUnauthorized
 		}
+		if s.BindSessionsToIP && sess.ClientIP != "" && clientIP != sess.ClientIP {
+			s.RecordAudit("SESSION_IP_MISMATCH", "", "admin:"+sess.ClientHost, agentHeader, clientIP, "DENIED",
+				fmt.Sprintf("session_id=%s issued_to=%s", sess.ID, sess.ClientIP))
+			return nil, ErrUnauthorized
+		}
 		agent := agentHeader
 		if agent == "" {
 			agent = sess.AgentName
@@ -580,7 +584,7 @@ type PutSecretInput struct {
 	Type        string            `json:"type"`
 	Description string            `json:"description"`
 	Tags        []string          `json:"tags"`
-	BlindOnly   bool              `json:"blind_only"`
+	BlindOnly   *bool             `json:"blind_only,omitempty"` // nil = keep the current flag on rotation
 	Value       string            `json:"value,omitempty"`
 	Data        map[string]string `json:"data,omitempty"`
 }
@@ -704,7 +708,9 @@ func (s *Store) PutSecret(caller *CallerIdentity, in PutSecretInput) (*SecretMet
 			rec.Tags = normalizeTags(in.Tags)
 		}
 		rec.SchemaKeys = schemaKeys
-		rec.BlindOnly = in.BlindOnly
+		if in.BlindOnly != nil {
+			rec.BlindOnly = *in.BlindOnly
+		}
 		rec.CurrentVersion = nextVer
 		rec.VersionCount = len(rec.Versions)
 		rec.UpdatedAt = now
@@ -773,15 +779,28 @@ func (s *Store) GetSecret(caller *CallerIdentity, secretPath string, version int
 	}
 	defer security.Zeroize(plaintext)
 
-	// Update LastAccessedAt metadata asynchronously/lightly
+	// Update LastAccessedAt on the record as it is *now* (re-read inside the write transaction),
+	// so a concurrent PutSecret rotation is never overwritten with the stale copy read above.
 	now := time.Now().UTC()
 	rec.LastAccessedAt = now
 	rec.LastAccessedBy = caller.AgentName
 	_ = s.db.Update(func(tx *bolt.Tx) error {
-		if raw, err := json.Marshal(rec); err == nil {
-			return tx.Bucket(bucketSecrets).Put([]byte(normPath), raw)
+		b := tx.Bucket(bucketSecrets)
+		raw := b.Get([]byte(normPath))
+		if len(raw) == 0 {
+			return nil
 		}
-		return nil
+		var latest SecretRecord
+		if err := json.Unmarshal(raw, &latest); err != nil {
+			return nil
+		}
+		latest.LastAccessedAt = now
+		latest.LastAccessedBy = caller.AgentName
+		updated, err := json.Marshal(latest)
+		if err != nil {
+			return nil
+		}
+		return b.Put([]byte(normPath), updated)
 	})
 
 	out := &DecryptedSecret{

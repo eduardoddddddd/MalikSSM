@@ -63,8 +63,8 @@ type DecryptedSecret struct {
 // SearchResult is returned by semantic/fuzzy search queries.
 type SearchResult struct {
 	SecretMetadata
-	Score       int      `json:"score"`
-	MatchedBy   []string `json:"matched_by"`
+	Score     int      `json:"score"`
+	MatchedBy []string `json:"matched_by"`
 }
 
 // Session represents an authenticated user session (e.g. from morning `malik login`).
@@ -72,6 +72,7 @@ type Session struct {
 	ID         string    `json:"id"`
 	TokenHash  string    `json:"token_hash"`
 	ClientHost string    `json:"client_host"`
+	ClientIP   string    `json:"client_ip,omitempty"`
 	AgentName  string    `json:"agent_name"`
 	CreatedAt  time.Time `json:"created_at"`
 	ExpiresAt  time.Time `json:"expires_at"`
@@ -93,8 +94,8 @@ type AppToken struct {
 
 // CallerIdentity describes who is making a request to the Vault.
 type CallerIdentity struct {
-	Subject       string   `json:"subject"`        // e.g. "admin-session", "app:bot-telegram"
-	AgentName     string   `json:"agent_name"`     // e.g. "claude", "antigravity", "malik-cli", "chatgpt", "boto3"
+	Subject       string   `json:"subject"`    // e.g. "admin-session", "app:bot-telegram"
+	AgentName     string   `json:"agent_name"` // e.g. "claude", "antigravity", "malik-cli", "chatgpt", "boto3"
 	ClientIP      string   `json:"client_ip"`
 	IsAdmin       bool     `json:"is_admin"`
 	AllowedScopes []string `json:"allowed_scopes"`

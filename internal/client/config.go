@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	DefaultServerURL  = "http://127.0.0.1:8443"
-	dpapiSessionCtx   = "MalikSSM::LocalClientSessionCache::v1"
+	DefaultServerURL = "http://127.0.0.1:8443"
+	dpapiSessionCtx  = "MalikSSM::LocalClientSessionCache::v1"
 )
 
 // LocalSession stores the workstation's active session with the Windows Server server.

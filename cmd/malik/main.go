@@ -12,11 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/malikssm/malik/internal/agentcfg"
 	"github.com/malikssm/malik/internal/client"
 	"github.com/malikssm/malik/internal/injector"
 	"github.com/malikssm/malik/internal/mcp"
 	"github.com/malikssm/malik/internal/security"
 	"github.com/malikssm/malik/internal/vault"
+	"golang.org/x/term"
 )
 
 type sliceFlag []string
@@ -85,9 +87,11 @@ func runMCP(args []string) {
 	srv := fs.String("server", "", "Optional MalikSSM server URL override")
 	tok := fs.String("token", "", "Optional MalikSSM token override")
 	caller := fs.String("caller", "mcp-agent", "Agent identifier for audit logs (e.g. claude, antigravity)")
+	noReveal := fs.Bool("no-reveal", false, "Never return secret values through secrets_get (agents must use secrets_exec)")
 	_ = fs.Parse(args)
 
 	mcpSrv := mcp.NewServer(*srv, *tok, *caller)
+	mcpSrv.NoReveal = *noReveal
 	if err := mcpSrv.ServeStdio(); err != nil {
 		fmt.Fprintf(os.Stderr, "MCP stdio error: %v\n", err)
 		os.Exit(1)
@@ -104,10 +108,9 @@ func runLogin(args []string) {
 
 	passphrase := *pass
 	if passphrase == "" {
-		fmt.Print("Introduce tu Contraseña Maestra (MalikSSM): ")
-		reader := bufio.NewReader(os.Stdin)
-		line, _ := reader.ReadString('\n')
-		passphrase = strings.TrimSpace(line)
+		passphrase = readPassphrase("Introduce tu Contraseña Maestra (MalikSSM): ")
+	} else {
+		warnPassFlag()
 	}
 	if passphrase == "" {
 		fatal("Passphrase cannot be empty")
@@ -262,7 +265,15 @@ func runSet(args []string) {
 	desc := fs.String("desc", "", "Semantic description for AI agents")
 	tags := fs.String("tags", "", "Comma-separated tags")
 	val := fs.String("value", "", "Plain string secret value")
+	blind := fs.Bool("blind", false, "Blind-only: agents can use it via secrets_exec but secrets_get never returns its values (--blind=false to clear)")
 	_ = fs.Parse(reorderFlagsFirst(args))
+
+	var blindOnly *bool
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "blind" {
+			blindOnly = blind
+		}
+	})
 
 	if fs.NArg() == 0 {
 		fatal("Usage: malik set <path> [key=val ...] [--value str] [--desc \"...\"] [--tags \"a,b\"]")
@@ -290,6 +301,7 @@ func runSet(args []string) {
 		Tags:        tagList,
 		Value:       *val,
 		Data:        data,
+		BlindOnly:   blindOnly,
 	})
 	if err != nil {
 		fatal("%v", err)
@@ -473,10 +485,9 @@ func runUnlock(args []string) {
 
 	passphrase := *pass
 	if passphrase == "" {
-		fmt.Print("Introduce tu Contraseña Maestra para desbloquear la Servidor Central: ")
-		reader := bufio.NewReader(os.Stdin)
-		line, _ := reader.ReadString('\n')
-		passphrase = strings.TrimSpace(line)
+		passphrase = readPassphrase("Introduce tu Contraseña Maestra para desbloquear el Servidor Central: ")
+	} else {
+		warnPassFlag()
 	}
 	api := client.New(*srv, "", "malik-cli")
 	if _, err := api.Unlock(passphrase, true); err != nil {
@@ -494,6 +505,11 @@ func runSessionToken() {
 }
 
 func runInitAgents(args []string) {
+	fs := flag.NewFlagSet("init-agents", flag.ExitOnError)
+	desktopCfg := fs.String("claude-desktop-config", "", "Ruta de claude_desktop_config.json (por defecto la del sistema operativo)")
+	skipDesktop := fs.Bool("skip-claude-desktop", false, "No registrar el MCP en Claude Desktop")
+	_ = fs.Parse(args)
+
 	exePath, err := os.Executable()
 	if err != nil {
 		fatal("Cannot determine executable path: %v", err)
@@ -518,6 +534,23 @@ func runInitAgents(args []string) {
 	fmt.Println("✔ Agentes configurados con protocolo Zero-Nagging MalikSSM:")
 	fmt.Printf("  Binario MCP : %s mcp\n", exePath)
 	fmt.Printf("  Regla Global: %s\n", claudeMD)
+
+	if *skipDesktop {
+		return
+	}
+	cfgPath := *desktopCfg
+	if cfgPath == "" {
+		cfgPath = agentcfg.ClaudeDesktopConfigPath()
+	}
+	backup, err := agentcfg.RegisterMCPServer(cfgPath, "malik", exePath, []string{"mcp", "--caller", "claude-desktop"})
+	if err != nil {
+		fatal("No se registró el MCP en Claude Desktop: %v", err)
+	}
+	fmt.Printf("  Claude Desktop: %s (resto de servidores MCP conservados)\n", cfgPath)
+	if backup != "" {
+		fmt.Printf("  Copia previa  : %s\n", backup)
+	}
+	fmt.Printf("  Claude Code   : claude mcp add --scope user malik -- \"%s\" mcp --caller claude-code\n", exePath)
 }
 
 // reorderFlagsFirst moves --flag arguments before positional arguments so Go's flag package parses them in any order.
@@ -527,7 +560,7 @@ func reorderFlagsFirst(args []string) []string {
 		a := args[i]
 		if strings.HasPrefix(a, "-") {
 			flags = append(flags, a)
-			if !strings.Contains(a, "=") && a != "--raw" && a != "--json" && a != "--keep-sessions" && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			if !strings.Contains(a, "=") && !isBoolFlag(a) && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				flags = append(flags, args[i+1])
 				i++
 			}
@@ -536,6 +569,35 @@ func reorderFlagsFirst(args []string) []string {
 		}
 	}
 	return append(flags, pos...)
+}
+
+// readPassphrase prompts without echoing the input when stdin is a terminal, and falls back to a
+// plain line read when it is piped (scripts, CI).
+func readPassphrase(prompt string) string {
+	fmt.Fprint(os.Stderr, prompt)
+	fd := int(os.Stdin.Fd())
+	if term.IsTerminal(fd) {
+		raw, err := term.ReadPassword(fd)
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			fatal("No se pudo leer la contraseña: %v", err)
+		}
+		return strings.TrimSpace(string(raw))
+	}
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	return strings.TrimSpace(line)
+}
+
+func warnPassFlag() {
+	fmt.Fprintln(os.Stderr, "⚠ --pass deja la contraseña maestra en el historial del shell y en la lista de procesos; omítelo para que se pida sin eco.")
+}
+
+func isBoolFlag(a string) bool {
+	switch strings.TrimLeft(a, "-") {
+	case "raw", "json", "keep-sessions", "blind":
+		return true
+	}
+	return false
 }
 
 func printUsage() {
