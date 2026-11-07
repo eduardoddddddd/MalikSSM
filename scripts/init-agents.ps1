@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Configura malik.exe en cualquiera de tus ordenadores:
     - Añade malik.exe al PATH de tu usuario de Windows

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Compiles MalikSSM statically (CGO_ENABLED=0) for Windows, macOS (Apple Silicon & Intel), and Linux (x64 & ARM64).
 #>

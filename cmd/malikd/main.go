@@ -115,7 +115,7 @@ func main() {
 	fmt.Printf("  Vault State    : Initialized=%v | Unlocked=%v | AutoUnseal=%v (%s)\n", st.Initialized, st.Unlocked, st.AutoUnsealReady, st.HardwareBacking)
 	fmt.Printf("  Sessions       : bound to client IP=%v\n", *bindSessions)
 	if !st.Initialized {
-		fmt.Println("  First run      : initialize from THIS machine (127.0.0.1); remote init is refused.")
+		fmt.Printf("  First run      : initialize from THIS machine (%s://%s); remote init is refused.\n", scheme, *addr)
 	}
 	fmt.Println("=======================================================================")
 
