@@ -189,7 +189,8 @@ func resolveInlinePlaceholders(api *client.Client, input string) (string, []stri
 // metadata such as host, port or username).
 func IsSensitiveFieldName(k string) bool {
 	switch strings.ToLower(strings.TrimSpace(k)) {
-	case "host", "hostname", "ip", "port", "user", "username", "region", "database", "db", "env", "environment":
+	case "host", "hostname", "ip", "port", "user", "username", "region", "database", "db", "env", "environment",
+		"url", "lan_ip", "tailscale_ip", "identity_file":
 		return false
 	default:
 		return true

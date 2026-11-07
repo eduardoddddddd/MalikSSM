@@ -266,6 +266,7 @@ func runSet(args []string) {
 	tags := fs.String("tags", "", "Comma-separated tags")
 	val := fs.String("value", "", "Plain string secret value")
 	blind := fs.Bool("blind", false, "Blind-only: agents can use it via secrets_exec but secrets_get never returns its values (--blind=false to clear)")
+	merge := fs.Bool("merge", false, "Keep the current fields and only add/replace the ones given")
 	_ = fs.Parse(reorderFlagsFirst(args))
 
 	var blindOnly *bool
@@ -276,16 +277,12 @@ func runSet(args []string) {
 	})
 
 	if fs.NArg() == 0 {
-		fatal("Usage: malik set <path> [key=val ...] [--value str] [--desc \"...\"] [--tags \"a,b\"]")
+		fatal("Usage: malik set <path> [key=val | key=? | key=@file ...] [--merge] [--blind] [--value str] [--desc \"...\"] [--tags \"a,b\"]")
 	}
 	secPath := fs.Arg(0)
-	data := make(map[string]string)
-	for _, kv := range fs.Args()[1:] {
-		if eq := strings.Index(kv, "="); eq > 0 {
-			data[kv[:eq]] = kv[eq+1:]
-		} else if *val == "" {
-			*val = kv
-		}
+	data, value, err := parseSetArgs(fs.Args()[1:], *val, readPassphrase, os.ReadFile)
+	if err != nil {
+		fatal("%v", err)
 	}
 
 	var tagList []string
@@ -294,12 +291,29 @@ func runSet(args []string) {
 	}
 
 	api := client.New(*srv, *tok, "malik-cli")
+	if *merge {
+		current, err := api.GetSecret(secPath, 0, "")
+		if err != nil {
+			fatal("--merge: no se pudo leer %q: %v", secPath, err)
+		}
+		merged := make(map[string]string, len(current.Data)+len(data))
+		for k, v := range current.Data {
+			merged[k] = v
+		}
+		for k, v := range data {
+			merged[k] = v
+		}
+		data = merged
+	}
+	if len(data) == 0 && value == "" {
+		fatal("Nada que guardar en %q: indica campos (clave=valor, clave=? o clave=@fichero) o --value. Un secreto vacío sobrescribiría la versión actual.", secPath)
+	}
 	meta, err := api.PutSecret(vault.PutSecretInput{
 		Path:        secPath,
 		Type:        *secType,
 		Description: *desc,
 		Tags:        tagList,
-		Value:       *val,
+		Value:       value,
 		Data:        data,
 		BlindOnly:   blindOnly,
 	})
@@ -571,6 +585,55 @@ func reorderFlagsFirst(args []string) []string {
 	return append(flags, pos...)
 }
 
+// parseSetArgs turns `malik set` positional arguments into KV data and/or a plain value.
+// A value of "?" is prompted for without echo (so it never lands in the shell history), "@path"
+// reads the value from a file (JSON keys, PEM files...) and "@@text" is a literal starting with "@".
+func parseSetArgs(args []string, plainValue string, prompt func(string) string, readFile func(string) ([]byte, error)) (map[string]string, string, error) {
+	resolve := func(name, v string) (string, error) {
+		switch {
+		case v == "?":
+			got := prompt(fmt.Sprintf("Valor para %s (no se mostrará): ", name))
+			if got == "" {
+				return "", fmt.Errorf("valor vacío para %s", name)
+			}
+			return got, nil
+		case strings.HasPrefix(v, "@@"):
+			return v[1:], nil
+		case strings.HasPrefix(v, "@") && len(v) > 1:
+			raw, err := readFile(v[1:])
+			if err != nil {
+				return "", fmt.Errorf("no se pudo leer %s para %s: %w", v[1:], name, err)
+			}
+			return strings.TrimRight(string(raw), "\r\n"), nil
+		}
+		return v, nil
+	}
+
+	data := make(map[string]string)
+	for _, kv := range args {
+		eq := strings.Index(kv, "=")
+		if eq <= 0 {
+			if plainValue == "" {
+				plainValue = kv
+			}
+			continue
+		}
+		v, err := resolve(kv[:eq], kv[eq+1:])
+		if err != nil {
+			return nil, "", err
+		}
+		data[kv[:eq]] = v
+	}
+	if plainValue != "" {
+		v, err := resolve("value", plainValue)
+		if err != nil {
+			return nil, "", err
+		}
+		plainValue = v
+	}
+	return data, plainValue, nil
+}
+
 // readPassphrase prompts without echoing the input when stdin is a terminal, and falls back to a
 // plain line read when it is piped (scripts, CI).
 func readPassphrase(prompt string) string {
@@ -594,7 +657,7 @@ func warnPassFlag() {
 
 func isBoolFlag(a string) bool {
 	switch strings.TrimLeft(a, "-") {
-	case "raw", "json", "keep-sessions", "blind":
+	case "raw", "json", "keep-sessions", "blind", "merge":
 		return true
 	}
 	return false
@@ -609,7 +672,8 @@ USO DIARIO:
   malik ls [prefijo]                                        Lista secretos disponibles
   malik search <consulta>                                   Búsqueda semántica por ruta, tags o campos
   malik get <ruta> [--field clave] [--raw]                  Obtiene y desencripta un secreto
-  malik set <ruta> [k=v ...] [--desc "..."] [--tags "a,b"]  Crea o rota un secreto
+  malik set <ruta> [k=v | k=? | k=@fichero ...] [--merge] [--blind] [--desc "..."] [--tags "a,b"]
+                                                            Crea o rota un secreto (k=? lo pide sin eco)
   malik totp <ruta> [--raw]                                 Genera el código 2FA TOTP de 6 dígitos
   malik run -s <ruta> -- <comando> [args...]                Inyecta secretos en RAM y censura logs
 

@@ -233,8 +233,12 @@ Funciona exactamente igual en PowerShell (Windows), Zsh (macOS) y Bash (Linux):
 # 1. Iniciar sesión en tu Mac, Linux o Windows
 malik login --server http://192.168.1.50:8443 --days 30
 
-# 2. Crear o actualizar secretos (soporta pares clave=valor o --value plano)
-malik set apis/openai/prod api_key=sk-proj-12345 org_id=org-99 --desc "API Key OpenAI" --tags "ia,openai"
+# 2. Crear o actualizar secretos. Los valores sensibles con "?" (se piden sin eco y no quedan
+#    en el historial del shell) o con "@fichero" (JSON, PEM...). --blind = el MCP nunca devuelve sus valores.
+malik set apis/openai/prod api_key=? org_id=org-99 --desc "API Key OpenAI" --tags "ia,openai" --blind
+malik set gcp/sa/mi-proyecto key_json=@C:\ruta\service-account.json --desc "Service account GCP" --tags "gcp" --blind
+#    --merge añade o cambia campos sin reescribir los demás
+malik set servidores/win-server/ssh --merge password=?
 
 # 3. Buscar secretos por lenguaje natural
 malik search "openai ia"
