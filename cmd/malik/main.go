@@ -415,7 +415,9 @@ func runSSH(args []string) {
 	srv := fs.String("server", "", "Server URL override")
 	tok := fs.String("token", "", "Token override")
 	timeout := fs.Int("timeout", 60, "Timeout in seconds")
-	stdinFile := fs.String("stdin-file", "", "File sent to the remote command's stdin (e.g. a script for 'powershell -Command -' or 'bash -s')")
+	stdinFile := fs.String("stdin-file", "", "File sent to the remote command's stdin")
+	scriptFile := fs.String("script", "", "Multi-line script file to run instead of a command (.ps1 -> PowerShell -EncodedCommand, otherwise bash -s)")
+	interpreter := fs.String("interpreter", "", "Interpreter for --script: powershell, pwsh, bash, sh, zsh (default: by file extension)")
 	jsonOut := fs.Bool("json", false, "Print the full result as JSON")
 
 	before, cmdParts := args, []string(nil)
@@ -427,17 +429,30 @@ func runSSH(args []string) {
 	}
 	_ = fs.Parse(reorderFlagsFirst(before))
 	if fs.NArg() == 0 {
-		fatal("Uso: malik ssh <equipo|ruta> [--timeout 60] [--stdin-file script] -- <comando>")
+		fatal("Uso: malik ssh <equipo|ruta> [--timeout 60] [--script fichero] [--stdin-file f] -- <comando>")
 	}
 	target := fs.Arg(0)
 	if cmdParts == nil {
 		cmdParts = fs.Args()[1:]
 	}
 	command := strings.Join(cmdParts, " ")
-	if strings.TrimSpace(command) == "" {
-		fatal("Falta el comando: malik ssh %s -- <comando>", target)
-	}
 	stdin := ""
+	if *scriptFile != "" {
+		raw, err := os.ReadFile(*scriptFile)
+		if err != nil {
+			fatal("No se pudo leer %s: %v", *scriptFile, err)
+		}
+		interp := *interpreter
+		if interp == "" {
+			interp = remote.InterpreterForFile(*scriptFile)
+		}
+		if command, stdin, err = remote.BuildScriptCommand(interp, string(raw)); err != nil {
+			fatal("%v", err)
+		}
+	}
+	if strings.TrimSpace(command) == "" {
+		fatal("Falta el comando: malik ssh %s -- <comando>  (o --script fichero)", target)
+	}
 	if *stdinFile != "" {
 		raw, err := os.ReadFile(*stdinFile)
 		if err != nil {
@@ -798,7 +813,7 @@ USO DIARIO:
                                                             Crea o rota un secreto (k=? lo pide sin eco)
   malik totp <ruta> [--raw]                                 Genera el código 2FA TOTP de 6 dígitos
   malik run -s <ruta> -- <comando> [args...]                Inyecta secretos en RAM y censura logs
-  malik ssh <equipo> [--stdin-file f] -- <comando>          Ejecuta en un equipo de la bóveda sin ver sus credenciales
+  malik ssh <equipo> [--script f.ps1|f.sh] -- <comando>     Ejecuta en un equipo de la bóveda sin ver sus credenciales
 
 AGENTES Y ADMINISTRACIÓN:
   malik mcp [--caller claude|antigravity]                   Arranca el servidor MCP nativo por stdio

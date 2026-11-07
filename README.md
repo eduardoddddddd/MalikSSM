@@ -225,7 +225,7 @@ Integrado dentro del binario `malik` en Windows, macOS y Linux siguiendo el est�
 | **`secrets_set`** | `path`, `type`, `description`, `tags`, `data`, `value`, `blind_only` | Crea un secreto nuevo o rota uno existente incrementando su versión. Si se omite `blind_only` al rotar, se conserva el valor actual. |
 | **`secrets_totp`** | `path` (string) | Calcula en tiempo real el código 2FA TOTP de 6 dígitos (RFC 6238) y los segundos restantes de validez. |
 | **`secrets_exec`** | `secrets` (string[]), `command` (string / string[]) | **Inyección a ciegas**: ejecuta un comando local inyectando los secretos en RAM y censurando (`***REDACTED***`) cualquier contraseña en la salida. |
-| **`remote_exec`** | `target` (string), `command` (string), `stdin` (opc.), `timeout_seconds` (opc.) | **Acción remota (como AWS SSM `send-command`)**: ejecuta un comando en un equipo de la bóveda por SSH con su clave/contraseña, sin devolver nunca las credenciales. Ver [8.5](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm). |
+| **`remote_exec`** | `target`, `command` **o** `script` + `interpreter`, `stdin` (opc.), `timeout_seconds` (opc.) | **Acción remota (como AWS SSM `send-command`)**: ejecuta un comando en un equipo de la bóveda por SSH con su clave/contraseña, sin devolver nunca las credenciales. Ver [8.5](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm). |
 | **`vault_status`** | *(ninguno)* | Devuelve el estado de salud, bloqueo, número de secretos y sesiones del servidor. |
 
 ### 8.2 Canal 2: CLI Universal e Inyector de Procesos (`malik`)
@@ -318,8 +318,9 @@ malik set equipos/web01/admin host=100.64.0.10 username=admin password=? --desc 
 
 # Uso (persona o agente)
 malik ssh web01 -- uptime
-malik ssh web01 --stdin-file deploy.sh -- bash -s
+malik ssh web01 --script deploy.sh                 # script de varias líneas (bash -s)
 malik ssh winserver -- 'Get-Service sshd'          # Windows OpenSSH: el comando lo ejecuta PowerShell
+malik ssh winserver --script mantenimiento.ps1     # PowerShell de varias líneas (-EncodedCommand)
 ```
 
 ### Permisos recomendados (en vez de «omitir permisos»)

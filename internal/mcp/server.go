@@ -330,6 +330,16 @@ func (s *Server) executeTool(name string, args map[string]any) (string, bool) {
 		target, _ := args["target"].(string)
 		command, _ := args["command"].(string)
 		stdin, _ := args["stdin"].(string)
+		if script, _ := args["script"].(string); script != "" {
+			interpreter, _ := args["interpreter"].(string)
+			if interpreter == "" {
+				return "MalikSSM remote_exec: 'interpreter' is required with 'script' (powershell for Windows, bash for Linux/macOS)", true
+			}
+			var err error
+			if command, stdin, err = remote.BuildScriptCommand(interpreter, script); err != nil {
+				return fmt.Sprintf("MalikSSM remote_exec: %v", err), true
+			}
+		}
 		timeout := 60 * time.Second
 		if secs, ok := args["timeout_seconds"].(float64); ok && secs > 0 {
 			timeout = time.Duration(secs) * time.Second

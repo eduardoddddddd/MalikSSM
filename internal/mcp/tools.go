@@ -117,10 +117,10 @@ func toolDefinitions() []map[string]any {
 		},
 		{
 			"name":        "remote_exec",
-			"description": "Run a command on a machine stored in MalikSSM (like AWS SSM send-command). MalikSSM looks up the target's host, user and SSH key or password in the vault, connects over SSH (host key verified), runs the command and returns stdout/stderr/exit_code with any credential redacted. You never see or handle the credentials. Use this instead of fetching passwords with secrets_get. Windows targets usually run PowerShell; for multi-line scripts pass them in 'stdin' with command 'powershell -NoProfile -Command -' (Windows) or 'bash -s' (Linux/macOS).",
+			"description": "Run a command on a machine stored in MalikSSM (like AWS SSM send-command). MalikSSM looks up the target's host, user and SSH key or password in the vault, connects over SSH (host key verified), runs the command and returns stdout/stderr/exit_code with any credential redacted. You never see or handle the credentials. Use this instead of fetching passwords with secrets_get. Windows targets run single commands in PowerShell. For multi-line scripts use 'script' + 'interpreter' (powershell for Windows, bash for Linux/macOS) instead of 'command': do not pipe scripts into 'powershell -Command -', which skips multi-line blocks.",
 			"inputSchema": map[string]any{
 				"type":     "object",
-				"required": []string{"target", "command"},
+				"required": []string{"target"},
 				"properties": map[string]any{
 					"target": map[string]any{
 						"type":        "string",
@@ -128,11 +128,20 @@ func toolDefinitions() []map[string]any {
 					},
 					"command": map[string]any{
 						"type":        "string",
-						"description": "Command line executed by the remote user's default shell.",
+						"description": "Command line executed by the remote user's default shell (required unless 'script' is given).",
 					},
 					"stdin": map[string]any{
 						"type":        "string",
-						"description": "Optional data sent to the command's stdin (e.g. a script).",
+						"description": "Optional data sent to the command's stdin.",
+					},
+					"script": map[string]any{
+						"type":        "string",
+						"description": "Multi-line script to run instead of 'command' (requires 'interpreter').",
+					},
+					"interpreter": map[string]any{
+						"type":        "string",
+						"enum":        []string{"powershell", "pwsh", "bash", "sh", "zsh"},
+						"description": "Interpreter for 'script': powershell (Windows, sent as -EncodedCommand) or bash/sh/zsh (Linux/macOS, sent on stdin).",
 					},
 					"timeout_seconds": map[string]any{
 						"type":        "number",
