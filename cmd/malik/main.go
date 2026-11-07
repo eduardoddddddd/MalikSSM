@@ -637,8 +637,11 @@ func parseSetArgs(args []string, plainValue string, prompt func(string) string, 
 // readPassphrase prompts without echoing the input when stdin is a terminal, and falls back to a
 // plain line read when it is piped (scripts, CI).
 func readPassphrase(prompt string) string {
-	fmt.Fprint(os.Stderr, prompt)
 	fd := int(os.Stdin.Fd())
+	if term.IsTerminal(fd) && capsLockOn() {
+		fmt.Fprintln(os.Stderr, "⚠ Bloq Mayús está activado.")
+	}
+	fmt.Fprint(os.Stderr, prompt)
 	if term.IsTerminal(fd) {
 		raw, err := term.ReadPassword(fd)
 		fmt.Fprintln(os.Stderr)

@@ -557,8 +557,17 @@ print(sm.get_secret_value(SecretId="apis/openai")["SecretString"])</pre>
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted)">Contraseña Maestra (Master Passphrase)</label>
-      <input type="password" id="authPass" placeholder="••••••••••••" onkeydown="if(event.key==='Enter') submitAuth()">
+      <input type="password" id="authPass" placeholder="••••••••••••" onkeydown="checkCapsLock(event); if(event.key==='Enter') submitAuth()" onkeyup="checkCapsLock(event)">
     </div>
+    <div id="authConfirmBox" class="hidden" style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--muted)">Repite la Contraseña Maestra</label>
+      <input type="password" id="authPass2" placeholder="••••••••••••" onkeydown="checkCapsLock(event); if(event.key==='Enter') submitAuth()" onkeyup="checkCapsLock(event)">
+    </div>
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="authShow" style="width:auto" onchange="toggleShowPass()">
+      <label for="authShow" style="font-size:12px;color:var(--muted)">Mostrar lo que escribo</label>
+    </div>
+    <div id="capsWarning" class="hidden" style="color:var(--amber, #F59E0B);font-size:12px;font-weight:700;margin-bottom:10px">⚠ Bloq Mayús está activado</div>
     <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="authAutoUnseal" checked style="width:auto">
       <label for="authAutoUnseal" style="font-size:12px;color:var(--muted)">Activar Auto-Unseal (Windows DPAPI en el servidor; en Linux/macOS requiere --auto-unseal)</label>
@@ -633,20 +642,40 @@ async function refreshStatus() {
   }
 }
 
+let authIsInit = false;
+
 function showAuthModal(isInit = false) {
+  authIsInit = isInit;
   const m = document.getElementById('authModal');
   m.classList.remove('hidden');
   document.getElementById('authTitle').innerText = isInit ? 'Inicializar Bóveda MalikSSM' : 'Iniciar Sesión / Desbloquear';
   document.getElementById('authSubtitle').innerText = isInit
-    ? 'Crea tu Contraseña Maestra para cifrar la Windows Server'
+    ? 'Crea tu Contraseña Maestra (mín. 12 caracteres). Si la pierdes, los secretos no se pueden recuperar.'
     : 'Introduce tu Contraseña Maestra';
+  document.getElementById('authConfirmBox').classList.toggle('hidden', !isInit);
   setTimeout(() => document.getElementById('authPass').focus(), 50);
+}
+
+function checkCapsLock(ev) {
+  if (ev && typeof ev.getModifierState === 'function') {
+    document.getElementById('capsWarning').classList.toggle('hidden', !ev.getModifierState('CapsLock'));
+  }
+}
+
+function toggleShowPass() {
+  const type = document.getElementById('authShow').checked ? 'text' : 'password';
+  document.getElementById('authPass').type = type;
+  document.getElementById('authPass2').type = type;
 }
 
 async function submitAuth() {
   const pass = document.getElementById('authPass').value;
   const errEl = document.getElementById('authError');
   errEl.innerText = '';
+  if (authIsInit) {
+    if (pass.length < 12) { errEl.innerText = 'Usa al menos 12 caracteres.'; return; }
+    if (pass !== document.getElementById('authPass2').value) { errEl.innerText = 'Las dos contraseñas no coinciden.'; return; }
+  }
   try {
     const res = await fetch('/v1/auth/login', {
       method: 'POST',
@@ -658,6 +687,7 @@ async function submitAuth() {
     sessionToken = data.token;
     localStorage.setItem('malik_ui_token', sessionToken);
     document.getElementById('authPass').value = '';
+    document.getElementById('authPass2').value = '';
     document.getElementById('authModal').classList.add('hidden');
     await refreshStatus();
   } catch (e) {
