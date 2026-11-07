@@ -292,7 +292,7 @@
   </div>
   <div class="status-bar">
     <div id="badgeVaultState" class="badge">Cargando...</div>
-    <div id="badgeDPAPI" class="badge">DPAPI/TPM</div>
+    <div id="badgeDPAPI" class="badge">DPAPI</div>
     <button class="btn" onclick="openModalSecret()">+ Nuevo Secreto</button>
     <button class="btn btn-danger" onclick="panicLockVault()" title="Borra la Master Key de la RAM inmediatamente">🔒 Bloquear Bóveda</button>
   </div>
@@ -318,7 +318,7 @@
     <div class="stat-card">
       <div class="label">Protección en Memoria</div>
       <div class="val" style="font-size:15px;color:var(--emerald);margin-top:8px">VirtualLock + Zeroize</div>
-      <div class="sub" id="statHardware">Windows DPAPI / TPM 2.0</div>
+      <div class="sub" id="statHardware">Windows DPAPI</div>
     </div>
   </div>
 
@@ -561,7 +561,7 @@ print(sm.get_secret_value(SecretId="apis/openai")["SecretString"])</pre>
     </div>
     <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="authAutoUnseal" checked style="width:auto">
-      <label for="authAutoUnseal" style="font-size:12px;color:var(--muted)">Activar Auto-Unseal con Hardware Windows DPAPI / TPM en la Servidor Central</label>
+      <label for="authAutoUnseal" style="font-size:12px;color:var(--muted)">Activar Auto-Unseal (Windows DPAPI en el servidor; en Linux/macOS requiere --auto-unseal)</label>
     </div>
     <div id="authError" style="color:var(--rose);font-size:12px;margin-bottom:10px"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="submitAuth()">Entrar en la Bóveda</button>
@@ -620,7 +620,7 @@ async function refreshStatus() {
 
     const bDpapi = document.getElementById('badgeDPAPI');
     bDpapi.className = st.auto_unseal_ready ? 'badge ok' : 'badge warn';
-    bDpapi.innerText = st.auto_unseal_ready ? '🛡️ Auto-Unseal TPM Activo' : 'Auto-Unseal Manual';
+    bDpapi.innerText = st.auto_unseal_ready ? '🛡️ Auto-Unseal Activo' : 'Auto-Unseal Manual';
 
     if (!sessionToken) {
       showAuthModal(false);

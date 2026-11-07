@@ -353,7 +353,7 @@ Elige una de estas tres opciones para dar servicio a tus otros equipos:
 | IP de LAN + **TLS** | Sin Tailscale | `--addr 192.168.1.13:8443 --tls-cert cert.pem --tls-key key.pem` |
 | Solo `127.0.0.1` | Servidor y agentes en el mismo equipo | (por defecto) |
 
-* **En Servidor Windows** (p. ej. un mini-PC o portátil siempre encendido):
+* **En Servidor Windows** (p. ej. un mini-PC o portátil siempre encendido). Instala una tarea programada que arranca `malikd` como **SYSTEM al iniciar Windows**, sin sesión iniciada; reintenta cada minuto si la IP de Tailscale aún no está lista. Log en `C:MalikSSMdatamalikd.log`. Para inicializar por SSH: `powershell -File C:MalikSSMinit-vault.ps1 -Server http://100.x.y.z:8443`.
   ```powershell
   .\scripts\install-server.ps1 -Port 8443 -BindAddress 100.x.y.z -InsecureHttp
   ```

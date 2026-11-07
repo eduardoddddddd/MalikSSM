@@ -184,7 +184,7 @@ func (s *Store) InitVault(passphrase string, enableAutoUnseal bool) error {
 	return nil
 }
 
-// TryAutoUnseal attempts to unseal the Master KEK using Windows DPAPI/TPM hardware protection.
+// TryAutoUnseal attempts to unseal the Master KEK using the auto-unseal blob (Windows DPAPI, or opt-in host-bound obfuscation elsewhere).
 func (s *Store) TryAutoUnseal() error {
 	if !s.IsInitialized() {
 		return ErrNotInitialized
@@ -217,7 +217,7 @@ func (s *Store) TryAutoUnseal() error {
 	s.kek = lk
 	s.mu.Unlock()
 
-	s.RecordAudit("AUTO_UNSEAL", "", "system", "dpapi-tpm", "127.0.0.1", "OK", "Vault auto-unsealed via Windows DPAPI/TPM")
+	s.RecordAudit("AUTO_UNSEAL", "", "system", "auto-unseal", "127.0.0.1", "OK", "Vault auto-unsealed via "+security.HardwareProviderName())
 	return nil
 }
 

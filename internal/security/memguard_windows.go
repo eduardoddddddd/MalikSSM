@@ -31,8 +31,8 @@ func HardwareProviderName() string {
 }
 
 // ProtectBytesHardware encrypts sensitive bytes (such as the Master KEK on the Servidor Central
-// or session.bin on a client workstation) using Windows DPAPI backed by the OS credential
-// store and TPM 2.0.
+// or session.bin on a client workstation) using Windows DPAPI, scoped to the account running
+// the process (any process of that account can unprotect it).
 func ProtectBytesHardware(plaintext []byte, extraContext string) ([]byte, error) {
 	if len(plaintext) == 0 {
 		return nil, fmt.Errorf("cannot protect empty payload")

@@ -94,7 +94,7 @@ func UnlockWithPassphrase(passphrase []byte, meta *VaultKeyMeta) (*LockedKey, er
 	return UnlockWithRawKEK(rawKEK, meta)
 }
 
-// UnlockWithRawKEK verifies a 32-byte raw KEK (e.g. unsealed via Windows DPAPI/TPM)
+// UnlockWithRawKEK verifies a 32-byte raw KEK (e.g. unsealed via Windows DPAPI)
 // against the vault canary and locks it into physical RAM.
 func UnlockWithRawKEK(rawKEK []byte, meta *VaultKeyMeta) (*LockedKey, error) {
 	if len(rawKEK) != KeySize {
