@@ -605,6 +605,7 @@ func runInitAgents(args []string) {
 	desktopCfg := fs.String("claude-desktop-config", "", "Ruta de claude_desktop_config.json (por defecto la del sistema operativo)")
 	skipDesktop := fs.Bool("skip-claude-desktop", false, "No registrar el MCP en Claude Desktop")
 	skipCode := fs.Bool("skip-claude-code", false, "No registrar el MCP en Claude Code (claude mcp add)")
+	skipAntigravity := fs.Bool("skip-antigravity", false, "No registrar el MCP en Google Antigravity (~/.gemini/config/mcp_config.json)")
 	permsYes := fs.Bool("claude-permissions", false, "Añadir sin preguntar los permisos acotados de MalikSSM a ~/.claude/settings.json")
 	permsNo := fs.Bool("no-claude-permissions", false, "No tocar los permisos de Claude Code")
 	_ = fs.Parse(args)
@@ -642,6 +643,28 @@ func runInitAgents(args []string) {
 		fmt.Printf("  Claude Desktop: %s (resto de servidores MCP conservados)\n", cfgPath)
 		if backup != "" {
 			fmt.Printf("  Copia previa  : %s\n", backup)
+		}
+	}
+
+	// 2b. MCP en Google Antigravity (si está instalado para este usuario)
+	if !*skipAntigravity {
+		if agPath, present := agentcfg.AntigravityConfigPath(); present {
+			backup, err := agentcfg.RegisterMCPServer(agPath, "malik", exePath, []string{"mcp", "--caller", "antigravity"})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  ⚠ No se registró el MCP en Antigravity: %v\n", err)
+			} else {
+				fmt.Printf("  Antigravity   : %s (resto de servidores MCP conservados)\n", agPath)
+				if backup != "" {
+					fmt.Printf("  Copia previa  : %s\n", backup)
+				}
+			}
+			// Reglas globales de Antigravity (y Gemini CLI): ~/.gemini/GEMINI.md
+			geminiMD := filepath.Join(filepath.Dir(filepath.Dir(agPath)), "GEMINI.md")
+			if changed, err := agentcfg.UpsertRuleBlock(geminiMD); err != nil {
+				fmt.Fprintf(os.Stderr, "  ⚠ No se pudo actualizar %s: %v\n", geminiMD, err)
+			} else if changed {
+				fmt.Printf("  Regla Gemini  : %s (actualizada)\n", geminiMD)
+			}
 		}
 	}
 

@@ -46,12 +46,30 @@ func RegisterMCPServer(cfgPath, name, command string, args []string) (string, er
 		}
 		servers = m
 	}
-	servers[name] = map[string]any{
+	entry := map[string]any{
 		"command": command,
 		"args":    args,
 	}
+	if current, ok := servers[name]; ok {
+		before, _ := json.Marshal(current)
+		after, _ := json.Marshal(entry)
+		if string(before) == string(after) {
+			return "", nil // already registered exactly like this: no rewrite, no new backup
+		}
+	}
+	servers[name] = entry
 	cfg["mcpServers"] = servers
 	return writeConfig(cfgPath, cfg)
+}
+
+// AntigravityConfigPath returns Google Antigravity's MCP config (~/.gemini/config/mcp_config.json,
+// the same "mcpServers" format as Claude Desktop) and whether Antigravity appears to be set up
+// for this user (~/.gemini exists).
+func AntigravityConfigPath() (string, bool) {
+	home, _ := os.UserHomeDir()
+	gemini := filepath.Join(home, ".gemini")
+	_, err := os.Stat(gemini)
+	return filepath.Join(gemini, "config", "mcp_config.json"), err == nil
 }
 
 // ClaudeCodeSettingsPath returns the user-level Claude Code settings file (~/.claude/settings.json).

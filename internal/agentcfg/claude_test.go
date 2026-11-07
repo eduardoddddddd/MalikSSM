@@ -52,6 +52,12 @@ func TestRegisterMCPServerPreservesExistingServers(t *testing.T) {
 	if env := servers["tdkop"].(map[string]any)["env"].(map[string]any); env["TIMEOUT"] != float64(30) {
 		t.Fatalf("numeric values were altered: %v", env["TIMEOUT"])
 	}
+
+	// Re-running with the same entry must not rewrite the file nor leave another backup.
+	again, err := RegisterMCPServer(cfgPath, "malik", `C:\bin\malik.exe`, []string{"mcp", "--caller", "claude-desktop"})
+	if err != nil || again != "" {
+		t.Fatalf("idempotent re-run should not write: backup=%q err=%v", again, err)
+	}
 }
 
 func TestRegisterMCPServerRefusesUnparseableConfig(t *testing.T) {

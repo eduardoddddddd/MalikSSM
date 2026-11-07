@@ -454,7 +454,7 @@ Las peticiones remotas a `/v1/system/init`, o un primer `login` remoto, reciben 
    *Qué hace automáticamente en tu Mac*:
    * Detecta si tu Mac es **Apple Silicon (`arm64`)** o **Intel (`amd64`)** e instala el binario nativo en `/usr/local/bin/malik` (o `~/.local/bin/malik`).
    * Registra el servidor MCP `malik` en **Claude Desktop para macOS** (`~/Library/Application Support/Claude/claude_desktop_config.json`).
-   * Registra el MCP en **Claude Code** (`claude mcp add --scope user`), si está instalado.
+   * Registra el MCP en **Claude Code** (`claude mcp add --scope user`) y en **Google Antigravity** (`~/.gemini/config/mcp_config.json`, con su regla en `~/.gemini/GEMINI.md`), si están instalados.
    * Escribe la regla para agentes en `~/.claude/CLAUDE.md` (bloque gestionado que se actualiza solo).
    * Te ofrece añadir los [permisos acotados](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm) a `~/.claude/settings.json`.
 2. Inicia sesión contra tu servidor:
@@ -485,7 +485,7 @@ Las peticiones remotas a `/v1/system/init`, o un primer `login` remoto, reciben 
    ```powershell
    .\scripts\init-agents.ps1
    ```
-   Añade `malik.exe` al PATH, registra el MCP en Claude Desktop y Claude Code (conservando tus otros servidores, con copia previa), escribe la regla para agentes y te ofrece los [permisos acotados](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm).
+   Añade `malik.exe` al PATH, registra el MCP en Claude Desktop, Claude Code y Google Antigravity (conservando tus otros servidores, con copia previa), escribe la regla para agentes y te ofrece los [permisos acotados](#85-operativa-con-agentes-acciones-no-contraseñas-como-aws-ssm).
 2. Inicia sesión contra tu servidor:
    ```powershell
    malik login --server http://IP-TAILSCALE-DEL-SERVIDOR:8443 --days 30
